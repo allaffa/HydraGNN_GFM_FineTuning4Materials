@@ -62,11 +62,16 @@ OUTPUT_DIR = str(REPO_ROOT / "examples" / "md17" / "benchmark_results")
 KCAL_PER_EV = 23.0609
 
 _VAR_CONFIG = {
+    "type": ["graph"],
+    "output_index": [0],
+    "output_dim": [1],
+    "output_names": ["graph_energy"],
     "graph_feature_names": ["energy"],
     "graph_feature_dims": [1],
     "node_feature_names": ["atomic_number"],
     "node_feature_dims": [1],
     "input_node_features": [0],
+    "denormalize_output": False,
 }
 
 
@@ -78,10 +83,17 @@ def evaluate_split(
     split_label: str,
     uma_model: str,
     uma_task: str,
-    device: str,
+    device: str | None,
     verbose: bool = True,
 ) -> dict:
-    """Load a dataset split and compute UMA energy + force MAE."""
+    """Load a dataset split and compute UMA energy + force MAE.
+
+    Energies are mean-centred before computing MAE to cancel the absolute
+    DFT-energy-reference offset between UMA (ωB97X-D) and the MD17 training
+    labels — consistent with the HydraGNN fine-tuning benchmark that also
+    trains on mean-shifted energies.  Forces are reference-invariant and are
+    evaluated without any centering.
+    """
     dataset = SimplePickleDataset(
         basedir=DATASET_DIR, label=split_label, var_config=_VAR_CONFIG
     )
@@ -93,26 +105,36 @@ def evaluate_split(
         model_name=uma_model, task_name=uma_task, device=device
     )
 
-    energy_errors = []
+    e_preds = []
+    e_trues = []
     force_errors_flat = []
 
     for i, data in enumerate(dataset):
         atoms = pyg_data_to_ase_atoms(data, periodic=False)
+        # Set charge/spin explicitly to silence fairchem warnings.
+        atoms.info["charge"] = 0
+        atoms.info["spin"] = 1
         atoms.calc = calc
 
-        e_pred = float(atoms.get_potential_energy())  # eV
+        e_preds.append(float(atoms.get_potential_energy()))
         f_pred = atoms.get_forces()  # [N, 3], eV/Å
 
-        e_true = float(data.energy.detach().cpu().squeeze())
+        e_trues.append(float(data.energy.detach().cpu().squeeze()))
         f_true = data.forces.detach().cpu().numpy()  # [N, 3]
 
-        energy_errors.append(e_pred - e_true)
         force_errors_flat.append((f_pred - f_true).ravel())
 
         if verbose and (i + 1) % 100 == 0:
             print(f"    [{split_label}] {i + 1}/{len(dataset)} done …")
 
-    energy_errors = np.asarray(energy_errors)
+    e_preds = np.asarray(e_preds)
+    e_trues = np.asarray(e_trues)
+
+    # Mean-centre both energy arrays to cancel the DFT-reference offset.
+    e_preds_c = e_preds - e_preds.mean()
+    e_trues_c = e_trues - e_trues.mean()
+    energy_errors = e_preds_c - e_trues_c
+
     force_flat = np.concatenate(force_errors_flat)
 
     return {
@@ -123,6 +145,11 @@ def evaluate_split(
         "force_mae_eV_A": float(np.abs(force_flat).mean()),
         "force_rmse_eV_A": float(np.sqrt((force_flat ** 2).mean())),
         "force_mae_kcal_mol_A": float(np.abs(force_flat).mean()) * KCAL_PER_EV,
+        "note": (
+            "Energies are mean-centred before MAE to cancel the DFT-reference "
+            "offset between UMA and the MD17 training labels. "
+            "Forces are evaluated without centering (reference-invariant)."
+        ),
     }
 
 

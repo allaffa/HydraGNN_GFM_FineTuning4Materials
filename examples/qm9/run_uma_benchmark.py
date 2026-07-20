@@ -76,11 +76,16 @@ OUTPUT_DIR = str(REPO_ROOT / "examples" / "qm9" / "benchmark_results")
 KCAL_PER_EV = 23.0609
 
 _VAR_CONFIG = {
+    "type": ["graph"],
+    "output_index": [0],
+    "output_dim": [1],
+    "output_names": ["graph_energy"],
     "graph_feature_names": ["energy"],
     "graph_feature_dims": [1],
     "node_feature_names": ["atomic_number"],
     "node_feature_dims": [1],
     "input_node_features": [0],
+    "denormalize_output": False,
 }
 
 
@@ -117,6 +122,8 @@ def evaluate_split(
 
     for i, data in enumerate(dataset):
         atoms = pyg_data_to_ase_atoms(data, periodic=False)
+        atoms.info["charge"] = 0
+        atoms.info["spin"] = 1
         atoms.calc = calc
 
         n_atoms = len(atoms)

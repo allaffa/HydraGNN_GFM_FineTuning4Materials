@@ -50,7 +50,6 @@ def build_uma_calculator(
     model_name: str = "uma-s-1p2",
     task_name: Literal["omat", "omol", "oc20", "odac", "omc"] = "omol",
     device: str | None = None,
-    local_cache: str | None = None,
 ):
     """Build and return a ``FAIRChemCalculator`` wrapping a UMA checkpoint.
 
@@ -65,9 +64,6 @@ def build_uma_calculator(
     device:
         Target device string (``"cuda"``, ``"cpu"``, …).  If *None*, uses CUDA
         when available, otherwise CPU.
-    local_cache:
-        Directory used by ``model_name_to_local_file`` to cache downloaded
-        checkpoints.  Defaults to ``~/.cache/fairchem``.
 
     Returns
     -------
@@ -75,36 +71,31 @@ def build_uma_calculator(
         ASE-compatible calculator with ``energy`` and ``forces`` properties.
     """
     try:
-        from fairchem.core import FAIRChemCalculator
-        from fairchem.core.models.model_registry import model_name_to_local_file
+        from fairchem.core import pretrained_mlip
+        from fairchem.core.calculate import FAIRChemCalculator
     except ImportError as exc:
         raise ImportError(
             "fairchem-core is required for UMA benchmarks.  Install it with:\n"
             "    pip install fairchem-core>=2.20\n"
             "Then accept the UMA license at https://huggingface.co/facebook/UMA\n"
-            "and authenticate: huggingface-cli login"
+            "and authenticate: hf auth login"
         ) from exc
 
     if device is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    if local_cache is None:
-        local_cache = os.path.expanduser("~/.cache/fairchem")
-
-    # If the caller passed a file path, use it directly; otherwise resolve name.
+    # Resolve checkpoint path: accept a local file path or a registered model name.
     if os.path.isfile(model_name):
         checkpoint_path = model_name
     else:
-        checkpoint_path = model_name_to_local_file(
-            model_name, local_cache=local_cache
+        checkpoint_path = pretrained_mlip.pretrained_checkpoint_path_from_name(
+            model_name
         )
 
-    calc = FAIRChemCalculator(
-        checkpoint_path=checkpoint_path,
-        task_name=task_name,
-        seed=0,
-        device=device,
+    predict_unit = pretrained_mlip.load_predict_unit(
+        checkpoint_path, device=device
     )
+    calc = FAIRChemCalculator(predict_unit, task_name=task_name)
     return calc
 
 

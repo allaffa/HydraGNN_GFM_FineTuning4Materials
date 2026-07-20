@@ -67,17 +67,34 @@ OUTPUT_DIR = str(REPO_ROOT / "examples" / "wiggle150" / "benchmark_results")
 KCAL_PER_EV = 23.0609
 
 _VAR_CONFIG = {
+    "type": ["graph"],
+    "output_index": [0],
+    "output_dim": [1],
+    "output_names": ["graph_energy"],
     "graph_feature_names": ["energy"],
     "graph_feature_dims": [1],
     "node_feature_names": ["atomic_number"],
     "node_feature_dims": [1],
     "input_node_features": [0],
+    "denormalize_output": False,
 }
 
 
 # ---------------------------------------------------------------------------
 # Evaluation
 # ---------------------------------------------------------------------------
+
+def _composition_key(data) -> tuple:
+    """Return a hashable composition fingerprint (element, count) tuple.
+
+    Used as a molecule identity proxy when no mol_id is stored.  Structures
+    with identical composition are assumed to be conformers of the same molecule.
+    """
+    import torch
+    z = data.x[:, 0].long()
+    unique, counts = torch.unique(z, return_counts=True)
+    return tuple(zip(unique.tolist(), counts.tolist()))
+
 
 def evaluate_split(
     split_label: str,
@@ -86,7 +103,18 @@ def evaluate_split(
     device: str | None,
     verbose: bool = True,
 ) -> dict:
-    """Load a dataset split and compute UMA energy MAE (mean-centred per molecule)."""
+    """Load a dataset split and compute UMA conformational energy MAE.
+
+    Wiggle150 stores energies as ``E_conformer - E_minimum_conformer`` (relative
+    to the lowest-energy structure of each molecule).  UMA predicts absolute
+    total energies.  To align the two scales we:
+
+      1. Group structures by composition fingerprint (proxy for molecule identity).
+      2. Within each group subtract the minimum UMA total energy, obtaining
+         UMA-predicted conformational energies relative to the same reference
+         convention as the GT.
+      3. Compute MAE between UMA relative energies and GT relative energies.
+    """
     dataset = SimplePickleDataset(
         basedir=DATASET_DIR, label=split_label, var_config=_VAR_CONFIG
     )
@@ -98,65 +126,50 @@ def evaluate_split(
         model_name=uma_model, task_name=uma_task, device=device
     )
 
-    # Collect raw energies grouped by molecule (identified by mol_id if present,
-    # otherwise treated as a single group).
-    e_preds = []
-    e_trues = []
-    mol_ids = []
+    # Collect per-structure results indexed by composition group
+    from collections import defaultdict
+    groups: dict = defaultdict(lambda: {"uma": [], "gt": [], "idx": []})
 
     for i, data in enumerate(dataset):
         atoms = pyg_data_to_ase_atoms(data, periodic=False)
+        atoms.info["charge"] = 0
+        atoms.info["spin"] = 1
         atoms.calc = calc
 
-        e_preds.append(float(atoms.get_potential_energy()))
+        e_uma = float(atoms.get_potential_energy())
 
-        # Ground-truth energy stored on the Data object.
-        # Wiggle150 stores relative energy in data.y (after var_config mapping)
-        # or data.energy depending on preprocessing version.
-        if hasattr(data, "energy") and data.energy is not None:
-            e_trues.append(float(data.energy.detach().cpu().squeeze()))
-        else:
-            # Fall back to batch.y[0] graph-level target
-            e_trues.append(float(data.y.detach().cpu().squeeze()[0]))
+        y = data.y.detach().cpu()
+        e_gt = float(y.item() if y.dim() == 0 else y.view(-1)[0])
 
-        # Molecule identifier for mean-centering (optional field)
-        mol_id = getattr(data, "mol_id", None)
-        if mol_id is None:
-            mol_id = getattr(data, "mol_prefix", None)
-        mol_ids.append(mol_id if mol_id is not None else 0)
+        comp_key = _composition_key(data)
+        groups[comp_key]["uma"].append(e_uma)
+        groups[comp_key]["gt"].append(e_gt)
+        groups[comp_key]["idx"].append(i)
 
         if verbose and (i + 1) % 100 == 0:
             print(f"    [{split_label}] {i + 1}/{len(dataset)} done …")
 
-    e_preds = np.asarray(e_preds)
-    e_trues = np.asarray(e_trues)
+    # Compute relative UMA energies within each composition group and collect errors
+    errors = []
+    for comp_key, grp in groups.items():
+        uma_arr = np.asarray(grp["uma"])
+        gt_arr = np.asarray(grp["gt"])
+        # Shift UMA to same reference as GT (minimum = 0 within the group)
+        uma_rel = uma_arr - uma_arr.min()
+        errors.extend((uma_rel - gt_arr).tolist())
 
-    # ------------------------------------------------------------------
-    # Mean-centre both arrays per molecule so that absolute energy offsets
-    # between UMA (ωB97X-D / DFT-MLFF) and Wiggle150 (training DFT level)
-    # cancel out.
-    # ------------------------------------------------------------------
-    unique_ids = list(dict.fromkeys(mol_ids))  # preserve insertion order
-    e_preds_centred = e_preds.copy()
-    e_trues_centred = e_trues.copy()
-
-    for uid in unique_ids:
-        mask = np.array([m == uid for m in mol_ids])
-        e_preds_centred[mask] -= e_preds[mask].mean()
-        e_trues_centred[mask] -= e_trues[mask].mean()
-
-    errors = e_preds_centred - e_trues_centred
+    errors = np.asarray(errors)
 
     return {
         "n_structures": len(errors),
-        "n_molecules": len(unique_ids),
+        "n_composition_groups": len(groups),
         "energy_mae_eV": float(np.abs(errors).mean()),
         "energy_rmse_eV": float(np.sqrt((errors ** 2).mean())),
         "energy_mae_kcal_mol": float(np.abs(errors).mean()) * KCAL_PER_EV,
         "note": (
-            "Energies are mean-centred per molecule before computing MAE, "
-            "to cancel absolute DFT-reference offsets between UMA and "
-            "the Wiggle150 training labels."
+            "UMA total energies are made relative within each composition group "
+            "(min-shifted) to match the Wiggle150 convention of "
+            "E_conf - E_min_conf.  Groups are identified by composition fingerprint."
         ),
     }
 
