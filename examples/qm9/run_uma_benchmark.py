@@ -203,7 +203,10 @@ def print_comparison_table(uma_results: dict, hydragnn_summary: dict | None):
             s = hydragnn_summary[key]
             e_mae = s.get(
                 "best_energy_per_atom_mae_eV",
-                s.get("best_mae_eV", s.get("best_energy_mae_eV", float("nan"))),
+                s.get(
+                    "best_energy_mae_eV_atom",
+                    s.get("best_mae_eV", s.get("best_energy_mae_eV", float("nan"))),
+                ),
             )
             print(
                 f"{label:<28s}"

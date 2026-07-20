@@ -210,7 +210,10 @@ def print_comparison_table(uma_results: dict, hydragnn_summary: dict | None):
             if key not in hydragnn_summary or key in printed:
                 continue
             s = hydragnn_summary[key]
-            e_mae = s.get("best_mae_eV", s.get("best_energy_mae_eV", float("nan")))
+            e_mae = s.get(
+                "best_val_mae_eV",
+                s.get("best_mae_eV", s.get("best_energy_mae_eV", float("nan"))),
+            )
             print(
                 f"{label:<28s}"
                 f"  {e_mae:10.4f}"
