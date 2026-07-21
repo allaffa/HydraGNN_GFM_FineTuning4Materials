@@ -50,6 +50,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import time
 import os
 import sys
 from pathlib import Path
@@ -115,6 +116,7 @@ def evaluate_split(
 
     e_preds, e_trues = [], []
     force_errors_flat = []
+    _t0 = time.perf_counter()
 
     for i, data in enumerate(dataset):
         atoms = pyg_data_to_ase_atoms(data, periodic=False)
@@ -134,6 +136,7 @@ def evaluate_split(
         if verbose and (i + 1) % 100 == 0:
             print(f"    [{split_label}] {i + 1}/{len(dataset)} done …")
 
+    _inference_sec = time.perf_counter() - _t0
     e_preds = np.asarray(e_preds)
     e_trues = np.asarray(e_trues)
     e_errors = (e_preds - e_preds.mean()) - (e_trues - e_trues.mean())
@@ -141,6 +144,7 @@ def evaluate_split(
 
     return {
         "n_structures": len(e_errors),
+        "inference_wall_sec": round(_inference_sec, 2),
         "energy_mae_eV": float(np.abs(e_errors).mean()),
         "energy_rmse_eV": float(np.sqrt((e_errors ** 2).mean())),
         "energy_mae_kcal_mol": float(np.abs(e_errors).mean()) * KCAL_PER_EV,
