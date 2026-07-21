@@ -16,12 +16,16 @@ Non-periodic small organic molecules.
 Energy reference treatment
 --------------------------
 MACE predicts *absolute* total DFT energies while QM9 labels are *atomization*
-energies.  To make the comparison meaningful we:
+energies.  To make the comparison meaningful we apply a per-element linear
+reference energy correction:
 
-  1. Compute MACE total energy per molecule and divide by the number of atoms.
-  2. Mean-centre both MACE per-atom energies and QM9 per-atom targets over the
-     evaluation split so that the absolute reference offset cancels.
-  3. Compute MAE on the mean-centred values.
+  1. Compute MACE total energy per molecule.
+  2. Fit per-element reference energies alpha_Z by least squares on the
+     evaluation split:  E_MACE - sum_Z(n_Z * alpha_Z) ≈ U0_total
+  3. Subtract the fitted reference term and divide by n_atoms.
+  4. Compare corrected per-atom energies to the QM9 U0 per-atom target.
+
+This is the standard zero-shot MLIP evaluation protocol for QM9.
 
 Usage
 -----
@@ -93,6 +97,26 @@ _VAR_CONFIG = {
 # Evaluation
 # ---------------------------------------------------------------------------
 
+def _fit_linear_reference(e_preds_total, compositions, gt_per_atom, n_atoms_list):
+    """Fit per-element reference energies (eV/atom of element type) by least squares.
+
+    Finds alpha_Z such that:  E_pred_total - sum_Z(n_Z * alpha_Z) ≈ U0_total
+    where U0_total = gt_per_atom * n_atoms.
+
+    Returns (alpha array, sorted element list).
+    """
+    all_elements = sorted({Z for comp in compositions for Z in comp})
+    elem_idx = {Z: j for j, Z in enumerate(all_elements)}
+    n = len(e_preds_total)
+    A = np.zeros((n, len(all_elements)))
+    for i, comp in enumerate(compositions):
+        for Z, count in comp.items():
+            A[i, elem_idx[Z]] = count
+    b = np.asarray(e_preds_total) - np.asarray(gt_per_atom) * np.asarray(n_atoms_list)
+    alpha, _, _, _ = np.linalg.lstsq(A, b, rcond=None)
+    return alpha, all_elements
+
+
 def evaluate_split(
     split_label: str,
     model_id: str,
@@ -101,8 +125,10 @@ def evaluate_split(
 ) -> dict:
     """Evaluate a single MACE model on one QM9 split.
 
-    MACE total energy / n_atoms is mean-centred against the QM9 per-atom
-    atomization energy (mean-centred) to cancel absolute reference offsets.
+    MACE predicts absolute total DFT energies; QM9 labels are per-atom
+    atomization energies.  A per-element linear reference correction is
+    fitted on the evaluation split via least squares to align energy scales
+    before computing MAE.  This is the standard zero-shot MLIP protocol.
     """
     dataset = SimplePickleDataset(
         basedir=DATASET_DIR, label=split_label, var_config=_VAR_CONFIG
@@ -114,7 +140,9 @@ def evaluate_split(
     calc = build_mace_calculator(model_id=model_id, device=device)
     needs_cs = MACE_MODELS[model_id]["needs_charge_spin"]
 
-    mace_per_atom = []
+    e_preds_total = []
+    compositions = []
+    n_atoms_list = []
     gt_per_atom = []
 
     for i, data in enumerate(dataset):
@@ -126,7 +154,13 @@ def evaluate_split(
 
         n_atoms = len(atoms)
         e_total = float(atoms.get_potential_energy())
-        mace_per_atom.append(e_total / n_atoms)
+        e_preds_total.append(e_total)
+        n_atoms_list.append(n_atoms)
+
+        comp: dict[int, int] = {}
+        for Z in atoms.get_atomic_numbers():
+            comp[int(Z)] = comp.get(int(Z), 0) + 1
+        compositions.append(comp)
 
         y = data.y.detach().cpu()
         gt_val = float(y.squeeze()) if y.numel() == 1 else float(y.view(-1)[0])
@@ -135,10 +169,21 @@ def evaluate_split(
         if verbose and (i + 1) % 100 == 0:
             print(f"    [{split_label}] {i + 1}/{len(dataset)} done …")
 
-    mace_arr = np.asarray(mace_per_atom)
-    gt_arr = np.asarray(gt_per_atom)
+    # Fit per-element linear reference energies, then subtract to align
+    # the MACE total energy scale with the QM9 U0 atomization target.
+    alpha, elements = _fit_linear_reference(
+        e_preds_total, compositions, gt_per_atom, n_atoms_list
+    )
+    elem_idx = {Z: j for j, Z in enumerate(elements)}
 
-    errors = (mace_arr - mace_arr.mean()) - (gt_arr - gt_arr.mean())
+    corrected_per_atom = []
+    for e_total, comp, n in zip(e_preds_total, compositions, n_atoms_list):
+        ref = sum(comp.get(Z, 0) * alpha[elem_idx[Z]] for Z in elements)
+        corrected_per_atom.append((e_total - ref) / n)
+
+    pred_arr = np.asarray(corrected_per_atom)
+    gt_arr = np.asarray(gt_per_atom)
+    errors = pred_arr - gt_arr
 
     return {
         "n_structures": len(errors),
@@ -146,8 +191,9 @@ def evaluate_split(
         "energy_per_atom_rmse_eV": float(np.sqrt((errors ** 2).mean())),
         "energy_per_atom_mae_kcal_mol": float(np.abs(errors).mean()) * KCAL_PER_EV,
         "note": (
-            "MACE total energy / n_atoms, mean-centred against the QM9 "
-            "per-atom atomization energy (mean-centred)."
+            "MACE total energy corrected by per-element linear reference "
+            "energies (least-squares fit on evaluation split), divided by "
+            "n_atoms, compared to QM9 per-atom atomization energy."
         ),
     }
 
@@ -169,7 +215,7 @@ def print_comparison_table(
 
     print("\n" + "=" * 72)
     print("  QM9 (U0 atomization energy) — MACE / UMA / HydraGNN comparison")
-    print("  [Metric: per-atom energy MAE (eV/atom), mean-centred]")
+    print("  [Metric: per-atom energy MAE (eV/atom), linear ref. correction]")
     print("=" * 72)
     print(hdr)
     print(sep)
@@ -267,6 +313,7 @@ def main():
     print(f"Models     : {', '.join(args.models)}")
 
     results: dict = {}
+    out_path = os.path.join(args.output_dir, "mace_benchmark_summary.json")
 
     for model_id in args.models:
         cfg = MACE_MODELS[model_id]
@@ -276,26 +323,29 @@ def main():
         print(f"{'=' * 60}")
 
         model_results: dict = {"label": cfg["label"]}
-        for split in args.splits:
-            print(f"\n--- Evaluating split: {split} ---")
-            metrics = evaluate_split(
-                split_label=split,
-                model_id=model_id,
-                device=args.device,
-                verbose=True,
-            )
-            model_results[split] = metrics
-            if metrics:
-                print(
-                    f"  Energy/atom MAE : {metrics['energy_per_atom_mae_eV']:.4f} eV/atom  "
-                    f"({metrics['energy_per_atom_mae_kcal_mol']:.4f} kcal/mol/atom)"
+        try:
+            for split in args.splits:
+                print(f"\n--- Evaluating split: {split} ---")
+                metrics = evaluate_split(
+                    split_label=split,
+                    model_id=model_id,
+                    device=args.device,
+                    verbose=True,
                 )
+                model_results[split] = metrics
+                if metrics:
+                    print(
+                        f"  Energy/atom MAE : {metrics['energy_per_atom_mae_eV']:.4f} eV/atom  "
+                        f"({metrics['energy_per_atom_mae_kcal_mol']:.4f} kcal/mol/atom)"
+                    )
+        except Exception as exc:
+            print(f"\n  [SKIP] {cfg['label']} failed: {exc}\n")
+            model_results["error"] = str(exc)
         results[model_id] = model_results
+        # Save incrementally so partial results are preserved if a later model fails.
+        with open(out_path, "w") as f:
+            json.dump(results, f, indent=2)
 
-    # Save results
-    out_path = os.path.join(args.output_dir, "mace_benchmark_summary.json")
-    with open(out_path, "w") as f:
-        json.dump(results, f, indent=2)
     print(f"\nResults saved to {out_path}")
 
     # Load optional comparison summaries

@@ -1,0 +1,32 @@
+{
+  "mace_off_medium": {
+    "label": "MACE-OFF23 (medium)",
+    "testset": {
+      "n_structures": 19625,
+      "energy_per_atom_mae_eV": 3.1173438291574467,
+      "energy_per_atom_rmse_eV": 5.130934996510871,
+      "energy_per_atom_mae_kcal_mol": 71.88875430981696,
+      "note": "MACE total energy corrected by per-element linear reference energies (least-squares fit on evaluation split), divided by n_atoms, compared to QM9 per-atom atomization energy."
+    }
+  },
+  "mace_polar_m": {
+    "label": "MACE-POLAR-1 (polar-1-m)",
+    "testset": {
+      "n_structures": 19625,
+      "energy_per_atom_mae_eV": 3.1182658998542188,
+      "energy_per_atom_rmse_eV": 5.131253000658083,
+      "energy_per_atom_mae_kcal_mol": 71.91001808994815,
+      "note": "MACE total energy corrected by per-element linear reference energies (least-squares fit on evaluation split), divided by n_atoms, compared to QM9 per-atom atomization energy."
+    }
+  },
+  "mace_mh1_omol": {
+    "label": "MACE-MH-1 (omol head)",
+    "testset": {
+      "n_structures": 19625,
+      "energy_per_atom_mae_eV": 3.118780591285122,
+      "energy_per_atom_rmse_eV": 5.131344299789153,
+      "energy_per_atom_mae_kcal_mol": 71.92188733756707,
+      "note": "MACE total energy corrected by per-element linear reference energies (least-squares fit on evaluation split), divided by n_atoms, compared to QM9 per-atom atomization energy."
+    }
+  }
+}

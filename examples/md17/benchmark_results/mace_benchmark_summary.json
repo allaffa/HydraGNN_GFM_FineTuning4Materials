@@ -1,0 +1,41 @@
+{
+  "mace_off_medium": {
+    "label": "MACE-OFF23 (medium)",
+    "testset": {
+      "n_structures": 75,
+      "energy_mae_eV": 0.0631796608729482,
+      "energy_rmse_eV": 0.07734371825318834,
+      "energy_mae_kcal_mol": 1.456979841424971,
+      "force_mae_eV_A": 0.31471745156989894,
+      "force_rmse_eV_A": 0.43829758197820895,
+      "force_mae_kcal_mol_A": 7.257667678908283,
+      "note": "Energies are mean-centred before MAE to cancel the DFT-reference offset.  Forces are evaluated without centering."
+    }
+  },
+  "mace_polar_m": {
+    "label": "MACE-POLAR-1 (polar-1-m)",
+    "testset": {
+      "n_structures": 75,
+      "energy_mae_eV": 0.059650261745344484,
+      "energy_rmse_eV": 0.07292905009745002,
+      "energy_mae_kcal_mol": 1.3755887210832145,
+      "force_mae_eV_A": 0.2998856461646472,
+      "force_rmse_eV_A": 0.4347378744723301,
+      "force_mae_kcal_mol_A": 6.915632897638313,
+      "note": "Energies are mean-centred before MAE to cancel the DFT-reference offset.  Forces are evaluated without centering."
+    }
+  },
+  "mace_mh1_omol": {
+    "label": "MACE-MH-1 (omol head)",
+    "testset": {
+      "n_structures": 75,
+      "energy_mae_eV": 0.061628904760489246,
+      "energy_rmse_eV": 0.07557350911335017,
+      "energy_mae_kcal_mol": 1.4212180097911664,
+      "force_mae_eV_A": 0.30845860680622983,
+      "force_rmse_eV_A": 0.444611849089482,
+      "force_mae_kcal_mol_A": 7.113333085697786,
+      "note": "Energies are mean-centred before MAE to cancel the DFT-reference offset.  Forces are evaluated without centering."
+    }
+  }
+}

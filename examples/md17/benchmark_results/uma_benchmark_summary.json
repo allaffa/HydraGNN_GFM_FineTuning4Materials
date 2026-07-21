@@ -1,0 +1,15 @@
+{
+  "model_name": "uma-s-1p2",
+  "task_name": "omol",
+  "dataset": "/Users/7ml/Documents/Codes/HydraGNN_GFM_FineTuning4Materials/dataset/md17_mlip.pickle",
+  "testset": {
+    "n_structures": 75,
+    "energy_mae_eV": 0.06064459826080096,
+    "energy_rmse_eV": 0.07398583389365107,
+    "energy_mae_kcal_mol": 1.3985190160325047,
+    "force_mae_eV_A": 0.3006390333175659,
+    "force_rmse_eV_A": 0.43545642495155334,
+    "force_mae_kcal_mol_A": 6.933006683433056,
+    "note": "Energies are mean-centred before MAE to cancel the DFT-reference offset between UMA and the MD17 training labels. Forces are evaluated without centering (reference-invariant)."
+  }
+}

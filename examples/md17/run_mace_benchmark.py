@@ -268,6 +268,7 @@ def main():
     print(f"Models     : {', '.join(args.models)}")
 
     results: dict = {}
+    out_path = os.path.join(args.output_dir, "mace_benchmark_summary.json")
 
     for model_id in args.models:
         cfg = MACE_MODELS[model_id]
@@ -277,30 +278,33 @@ def main():
         print(f"{'=' * 60}")
 
         model_results: dict = {"label": cfg["label"]}
-        for split in args.splits:
-            print(f"\n--- Evaluating split: {split} ---")
-            metrics = evaluate_split(
-                split_label=split,
-                model_id=model_id,
-                device=args.device,
-                verbose=True,
-            )
-            model_results[split] = metrics
-            if metrics:
-                print(
-                    f"  Energy MAE : {metrics['energy_mae_eV']:.4f} eV  "
-                    f"({metrics['energy_mae_kcal_mol']:.4f} kcal/mol)"
+        try:
+            for split in args.splits:
+                print(f"\n--- Evaluating split: {split} ---")
+                metrics = evaluate_split(
+                    split_label=split,
+                    model_id=model_id,
+                    device=args.device,
+                    verbose=True,
                 )
-                print(
-                    f"  Force  MAE : {metrics['force_mae_eV_A']:.4f} eV/Å  "
-                    f"({metrics['force_mae_kcal_mol_A']:.4f} kcal/(mol·Å))"
-                )
+                model_results[split] = metrics
+                if metrics:
+                    print(
+                        f"  Energy MAE : {metrics['energy_mae_eV']:.4f} eV  "
+                        f"({metrics['energy_mae_kcal_mol']:.4f} kcal/mol)"
+                    )
+                    print(
+                        f"  Force  MAE : {metrics['force_mae_eV_A']:.4f} eV/Å  "
+                        f"({metrics['force_mae_kcal_mol_A']:.4f} kcal/(mol·Å))"
+                    )
+        except Exception as exc:
+            print(f"\n  [SKIP] {cfg['label']} failed: {exc}\n")
+            model_results["error"] = str(exc)
         results[model_id] = model_results
+        # Save incrementally so partial results are preserved if a later model fails.
+        with open(out_path, "w") as f:
+            json.dump(results, f, indent=2)
 
-    # Save results
-    out_path = os.path.join(args.output_dir, "mace_benchmark_summary.json")
-    with open(out_path, "w") as f:
-        json.dump(results, f, indent=2)
     print(f"\nResults saved to {out_path}")
 
     # Load optional comparison summaries

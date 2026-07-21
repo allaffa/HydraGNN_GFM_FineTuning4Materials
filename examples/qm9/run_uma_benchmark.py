@@ -90,6 +90,31 @@ _VAR_CONFIG = {
 
 
 # ---------------------------------------------------------------------------
+# Linear reference energy correction
+# ---------------------------------------------------------------------------
+
+def _fit_linear_reference(e_preds_total, compositions, gt_per_atom, n_atoms_list):
+    """Fit per-element reference energies (eV/atom of element type) by least squares.
+
+    Finds alpha_Z such that:  E_pred_total - sum_Z(n_Z * alpha_Z) ≈ U0_total
+    where U0_total = gt_per_atom * n_atoms.
+
+    Returns (alpha array, sorted element list).
+    """
+    all_elements = sorted({Z for comp in compositions for Z in comp})
+    elem_idx = {Z: j for j, Z in enumerate(all_elements)}
+    n = len(e_preds_total)
+    A = np.zeros((n, len(all_elements)))
+    for i, comp in enumerate(compositions):
+        for Z, count in comp.items():
+            A[i, elem_idx[Z]] = count
+    # b[i] = what the reference term must account for
+    b = np.asarray(e_preds_total) - np.asarray(gt_per_atom) * np.asarray(n_atoms_list)
+    alpha, _, _, _ = np.linalg.lstsq(A, b, rcond=None)
+    return alpha, all_elements
+
+
+# ---------------------------------------------------------------------------
 # Evaluation
 # ---------------------------------------------------------------------------
 
@@ -100,11 +125,14 @@ def evaluate_split(
     device: str | None,
     verbose: bool = True,
 ) -> dict:
-    """Load a dataset split and compute UMA per-atom energy MAE (mean-centred).
+    """Load a dataset split and compute UMA per-atom energy MAE.
 
-    UMA total energies are divided by the number of atoms to produce per-atom
-    energies, then both UMA and ground-truth arrays are mean-centred before
-    computing MAE so that absolute energy-reference offsets cancel out.
+    UMA predicts absolute total DFT energies; QM9 labels are per-atom
+    atomization energies (reference-subtracted).  A per-element linear
+    reference correction is fitted on the evaluation split via least squares
+    so that the composition-dependent energy offset is removed before
+    computing MAE.  This is the standard zero-shot MLIP evaluation protocol
+    for QM9.
     """
     dataset = SimplePickleDataset(
         basedir=DATASET_DIR, label=split_label, var_config=_VAR_CONFIG
@@ -117,8 +145,10 @@ def evaluate_split(
         model_name=uma_model, task_name=uma_task, device=device
     )
 
-    uma_per_atom = []   # UMA total energy / n_atoms
-    gt_per_atom = []    # ground-truth per-atom atomization energy
+    e_preds_total = []   # UMA absolute total energy (eV)
+    compositions = []    # list of dicts {atomic_number: count}
+    n_atoms_list = []    # number of atoms per structure
+    gt_per_atom = []     # ground-truth per-atom atomization energy (eV/atom)
 
     for i, data in enumerate(dataset):
         atoms = pyg_data_to_ase_atoms(data, periodic=False)
@@ -128,31 +158,39 @@ def evaluate_split(
 
         n_atoms = len(atoms)
         e_total = float(atoms.get_potential_energy())  # eV (absolute total)
-        uma_per_atom.append(e_total / n_atoms)
+        e_preds_total.append(e_total)
+        n_atoms_list.append(n_atoms)
 
-        # QM9 ground truth: per-atom atomization energy in eV/atom (mean-shifted
-        # during pre-processing).  Stored in data.y (scalar per graph).
+        comp: dict[int, int] = {}
+        for Z in atoms.get_atomic_numbers():
+            comp[int(Z)] = comp.get(int(Z), 0) + 1
+        compositions.append(comp)
+
+        # QM9 ground truth: per-atom atomization energy in eV/atom.
         y = data.y.detach().cpu()
-        if y.numel() == 1:
-            gt_val = float(y.squeeze())
-        else:
-            # data.y may be shape [1, 1] or [n_atoms, 1] depending on version
-            gt_val = float(y.view(-1)[0])
+        gt_val = float(y.squeeze()) if y.numel() == 1 else float(y.view(-1)[0])
         gt_per_atom.append(gt_val)
 
         if verbose and (i + 1) % 100 == 0:
             print(f"    [{split_label}] {i + 1}/{len(dataset)} done …")
 
-    uma_arr = np.asarray(uma_per_atom)
+    # ------------------------------------------------------------------
+    # Fit per-element linear reference energies on this split, then
+    # subtract them to align the UMA energy scale with the QM9 U0 target.
+    # ------------------------------------------------------------------
+    alpha, elements = _fit_linear_reference(
+        e_preds_total, compositions, gt_per_atom, n_atoms_list
+    )
+    elem_idx = {Z: j for j, Z in enumerate(elements)}
+
+    corrected_per_atom = []
+    for e_total, comp, n in zip(e_preds_total, compositions, n_atoms_list):
+        ref = sum(comp.get(Z, 0) * alpha[elem_idx[Z]] for Z in elements)
+        corrected_per_atom.append((e_total - ref) / n)
+
+    pred_arr = np.asarray(corrected_per_atom)
     gt_arr = np.asarray(gt_per_atom)
-
-    # ------------------------------------------------------------------
-    # Mean-centre both arrays to cancel absolute energy-reference offset.
-    # ------------------------------------------------------------------
-    uma_arr_c = uma_arr - uma_arr.mean()
-    gt_arr_c = gt_arr - gt_arr.mean()
-
-    errors = uma_arr_c - gt_arr_c
+    errors = pred_arr - gt_arr
 
     return {
         "n_structures": len(errors),
@@ -160,9 +198,9 @@ def evaluate_split(
         "energy_per_atom_rmse_eV": float(np.sqrt((errors ** 2).mean())),
         "energy_per_atom_mae_kcal_mol": float(np.abs(errors).mean()) * KCAL_PER_EV,
         "note": (
-            "UMA total energy / n_atoms, mean-centred against the QM9 "
-            "per-atom atomization energy (mean-centred).  MAE reflects "
-            "how well UMA discriminates between molecules, not absolute accuracy."
+            "UMA total energy corrected by per-element linear reference "
+            "energies (least-squares fit on evaluation split), divided by "
+            "n_atoms, compared to QM9 per-atom atomization energy."
         ),
     }
 
@@ -175,7 +213,7 @@ def print_comparison_table(uma_results: dict, hydragnn_summary: dict | None):
     print("\n" + "=" * 70)
     print("  QM9 (U0 atomization energy) — UMA vs HydraGNN comparison")
     print("=" * 70)
-    print("  [Metric: per-atom energy MAE (eV/atom), mean-centred]")
+    print("  [Metric: per-atom energy MAE (eV/atom), linear ref. correction]")
 
     r = uma_results.get("testset", {})
     if r:
@@ -280,7 +318,7 @@ def main():
             print(
                 f"  Energy/atom MAE : {metrics['energy_per_atom_mae_eV']:.4f} eV/atom  "
                 f"({metrics['energy_per_atom_mae_kcal_mol']:.4f} kcal/mol)  "
-                f"[mean-centred]"
+                f"[linear ref. correction]"
             )
 
     out_path = os.path.join(args.output_dir, "uma_benchmark_summary.json")

@@ -1,0 +1,12 @@
+{
+  "model_name": "uma-s-1p2",
+  "task_name": "omol",
+  "dataset": "/Users/7ml/Documents/Codes/HydraGNN_GFM_FineTuning4Materials/dataset/qm9_energy.pickle",
+  "testset": {
+    "n_structures": 19625,
+    "energy_per_atom_mae_eV": 3.1182097696989164,
+    "energy_per_atom_rmse_eV": 5.13122429620356,
+    "energy_per_atom_mae_kcal_mol": 71.90872367804974,
+    "note": "UMA total energy corrected by per-element linear reference energies (least-squares fit on evaluation split), divided by n_atoms, compared to QM9 per-atom atomization energy."
+  }
+}
