@@ -197,3 +197,29 @@ def timing_dict(
             round(n_test / inference_wall_sec, 2) if inference_wall_sec > 0 else None
         ),
     }
+
+
+def print_timing_summary(entries: list[tuple]) -> None:
+    """Print a compact wall-clock timing table.
+
+    Parameters
+    ----------
+    entries : list of (label, train_sec, infer_sec)
+        ``train_sec`` / ``infer_sec`` may be ``None`` when not applicable
+        (e.g. zero-shot models have no training time).
+    """
+    rows = [e for e in entries if e[1] is not None or e[2] is not None]
+    if not rows:
+        return
+
+    print("\n" + "=" * 62)
+    print("  Wall-clock timing (seconds)")
+    print("=" * 62)
+    print(f"{'Model':<34s}  {'Train (s)':>10s}  {'Infer (s)':>10s}")
+    print("-" * 62)
+    for label, train_sec, infer_sec in rows:
+        train_str = f"{train_sec:10.1f}" if train_sec is not None else f"{'—':>10s}"
+        infer_str = f"{infer_sec:10.2f}" if infer_sec is not None else f"{'—':>10s}"
+        print(f"{label:<34s}  {train_str}  {infer_str}")
+    print()
+

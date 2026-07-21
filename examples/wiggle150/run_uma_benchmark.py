@@ -59,6 +59,7 @@ from hydragnn.utils.distributed import setup_ddp
 from hydragnn.utils.datasets.pickledataset import SimplePickleDataset
 
 from utils.uma_calculator import build_uma_calculator, pyg_data_to_ase_atoms
+from utils.finetune_utils import print_timing_summary
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -182,10 +183,19 @@ def evaluate_split(
 # Reporting
 # ---------------------------------------------------------------------------
 
-def print_comparison_table(uma_results: dict, hydragnn_summary: dict | None):
+def print_comparison_table(
+    uma_results: dict,
+    hydragnn_summary: dict | None,
+    uma_finetuned: dict | None = None,
+):
     print("\n" + "=" * 70)
     print("  Wiggle150 — UMA vs HydraGNN fine-tuning comparison")
     print("=" * 70)
+
+    timing_entries: list[tuple] = []
+
+    def _row(label, e_mae):
+        print(f"{label:<28s}  {e_mae:10.4f}  {e_mae * KCAL_PER_EV:17.4f}")
 
     r = uma_results.get("testset", {})
     if r:
@@ -193,11 +203,21 @@ def print_comparison_table(uma_results: dict, hydragnn_summary: dict | None):
             f"\n{'Model':<28s}  {'E-MAE (eV)':>10s}  {'E-MAE (kcal/mol)':>17s}"
         )
         print("-" * 60)
-        print(
-            f"{'UMA ' + uma_results['model_name']:<28s}"
-            f"  {r['energy_mae_eV']:10.4f}"
-            f"  {r['energy_mae_kcal_mol']:17.4f}"
+        _row("UMA " + uma_results["model_name"], r["energy_mae_eV"])
+        timing_entries.append(
+            ("UMA " + uma_results["model_name"], None, r.get("inference_wall_sec"))
         )
+
+    # UMA rows (fine-tuned)
+    if uma_finetuned:
+        for name, fr in uma_finetuned.items():
+            sr = fr.get("testset", {})
+            if sr:
+                label = f"UMA {name} (FT)"
+                _row(label, sr.get("energy_mae_eV", float("nan")))
+                timing_entries.append(
+                    (label, fr.get("training_wall_sec"), sr.get("inference_wall_sec"))
+                )
 
     if hydragnn_summary:
         labels = {
@@ -218,13 +238,13 @@ def print_comparison_table(uma_results: dict, hydragnn_summary: dict | None):
                 "best_val_mae_eV",
                 s.get("best_mae_eV", s.get("best_energy_mae_eV", float("nan"))),
             )
-            print(
-                f"{label:<28s}"
-                f"  {e_mae:10.4f}"
-                f"  {e_mae * KCAL_PER_EV:17.4f}"
+            _row(label, e_mae)
+            timing_entries.append(
+                (label, s.get("training_wall_sec"), s.get("inference_wall_sec"))
             )
             printed.add(key)
     print()
+    print_timing_summary(timing_entries)
 
 
 # ---------------------------------------------------------------------------
@@ -304,7 +324,14 @@ def main():
         with open(args.hydragnn_summary) as f:
             hydragnn_summary = json.load(f)
 
-    print_comparison_table(results, hydragnn_summary)
+    # Auto-load fine-tuned UMA summary from the output directory if present.
+    uma_finetuned = None
+    ft_uma_path = os.path.join(args.output_dir, "uma_finetuned_summary.json")
+    if os.path.isfile(ft_uma_path):
+        with open(ft_uma_path) as f:
+            uma_finetuned = json.load(f)
+
+    print_comparison_table(results, hydragnn_summary, uma_finetuned)
 
 
 if __name__ == "__main__":

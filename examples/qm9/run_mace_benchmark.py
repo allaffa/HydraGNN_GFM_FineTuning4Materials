@@ -70,6 +70,7 @@ from hydragnn.utils.distributed import setup_ddp
 from hydragnn.utils.datasets.pickledataset import SimplePickleDataset
 
 from utils.mace_calculator import MACE_MODELS, build_mace_calculator, pyg_data_to_ase_atoms
+from utils.finetune_utils import print_timing_summary
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -210,6 +211,8 @@ def print_comparison_table(
     mace_results: dict,
     uma_summary: dict | None,
     hydragnn_summary: dict | None,
+    mace_finetuned: dict | None = None,
+    uma_finetuned: dict | None = None,
 ):
     KCAL = KCAL_PER_EV
     hdr = (
@@ -224,16 +227,35 @@ def print_comparison_table(
     print(hdr)
     print(sep)
 
+    timing_entries: list[tuple] = []
+
     def _row(label, e_mae):
         print(f"{label:<30s}  {e_mae:15.4f}  {e_mae * KCAL:22.4f}")
 
-    # MACE rows
+    # MACE rows (zero-shot)
     for mid in _ALL_MODEL_IDS:
         if mid not in mace_results:
             continue
         sr = mace_results[mid].get("testset", {})
         if sr:
             _row(MACE_MODELS[mid]["label"], sr["energy_per_atom_mae_eV"])
+            timing_entries.append(
+                (MACE_MODELS[mid]["label"], None, sr.get("inference_wall_sec"))
+            )
+
+    # MACE rows (fine-tuned)
+    if mace_finetuned:
+        for mid in _ALL_MODEL_IDS:
+            if mid not in mace_finetuned:
+                continue
+            fr = mace_finetuned[mid]
+            sr = fr.get("testset", {})
+            if sr:
+                label = f"{MACE_MODELS[mid]['label']} (FT)"
+                _row(label, sr["energy_per_atom_mae_eV"])
+                timing_entries.append(
+                    (label, fr.get("training_wall_sec"), sr.get("inference_wall_sec"))
+                )
 
     # UMA row
     if uma_summary:
@@ -247,6 +269,26 @@ def print_comparison_table(
                     ur.get("energy_mae_eV", float("nan")),
                 ),
             )
+            timing_entries.append(
+                (f"UMA {model_name}", None, ur.get("inference_wall_sec"))
+            )
+
+    # UMA rows (fine-tuned)
+    if uma_finetuned:
+        for name, fr in uma_finetuned.items():
+            sr = fr.get("testset", {})
+            if sr:
+                label = f"UMA {name} (FT)"
+                _row(
+                    label,
+                    sr.get(
+                        "energy_per_atom_mae_eV",
+                        sr.get("energy_mae_eV", float("nan")),
+                    ),
+                )
+                timing_entries.append(
+                    (label, fr.get("training_wall_sec"), sr.get("inference_wall_sec"))
+                )
 
     # HydraGNN rows
     if hydragnn_summary:
@@ -269,8 +311,12 @@ def print_comparison_table(
                 ),
             )
             _row(label, e_mae)
+            timing_entries.append(
+                (label, s.get("training_wall_sec"), s.get("inference_wall_sec"))
+            )
 
     print()
+    print_timing_summary(timing_entries)
 
 
 # ---------------------------------------------------------------------------
@@ -363,7 +409,22 @@ def main():
         with open(args.uma_summary) as f:
             uma_summary = json.load(f)
 
-    print_comparison_table(results, uma_summary, hydragnn_summary)
+    # Auto-load fine-tuned summaries from the output directory if present.
+    mace_finetuned = None
+    ft_mace_path = os.path.join(args.output_dir, "mace_finetuned_summary.json")
+    if os.path.isfile(ft_mace_path):
+        with open(ft_mace_path) as f:
+            mace_finetuned = json.load(f)
+
+    uma_finetuned = None
+    ft_uma_path = os.path.join(args.output_dir, "uma_finetuned_summary.json")
+    if os.path.isfile(ft_uma_path):
+        with open(ft_uma_path) as f:
+            uma_finetuned = json.load(f)
+
+    print_comparison_table(
+        results, uma_summary, hydragnn_summary, mace_finetuned, uma_finetuned
+    )
 
 
 if __name__ == "__main__":

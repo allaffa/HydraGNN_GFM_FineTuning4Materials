@@ -1,11 +1,8 @@
 #!/usr/bin/env python3
-"""MD17 MLIP benchmark: fine-tuning (unfrozen) vs scratch training with
-energy + forces (interatomic potential mode).
+"""QM9 energy-only benchmark: fine-tuning strategies vs scratch training.
 
-The pretrained GFM already supports graph-level energy heads with autograd
-forces via HydraGNN's EnhancedModelWrapper.  We keep a single graph-level
-head and train with compute_grad_energy=True so the loss includes:
-  energy_weight * MSE(E_pred, E_true) + force_weight * MSE(F_pred, F_true)
+Predicts per-atom atomization energy (eV/atom), mean-shifted.
+No force computation — uses standard graph-level MAE loss.
 """
 
 import sys, os, json, copy, time
@@ -16,6 +13,7 @@ sys.path.insert(0, str(REPO_ROOT / "HydraGNN"))
 sys.path.insert(0, str(REPO_ROOT))
 
 import torch
+import torch.nn.functional as F
 import numpy as np
 import matplotlib
 matplotlib.use("Agg")
@@ -35,7 +33,6 @@ from hydragnn.utils.input_config_parsing.config_utils import (
     update_config_equivariance,
 )
 from hydragnn.train.train_validate_test import (
-    get_head_indices,
     resolve_precision,
     move_batch_to_device,
     get_autocast_and_scaler,
@@ -55,15 +52,24 @@ PRETRAINED_DIR = str(
     REPO_ROOT / "pretrained_model_ensemble" / "OneDrive_1_4-7-2026"
     / "multidataset_hpo-BEST6-fp64"
 )
-FT_CONFIG_PATH = str(REPO_ROOT / "examples" / "md17" / "finetuning_config_mlip.json")
-FT_CONFIG_ANI1X_PATH = str(REPO_ROOT / "examples" / "md17" / "finetuning_config_mlip_ani1x.json")
-DATASET_DIR = str(REPO_ROOT / "dataset" / "md17_mlip.pickle")
-OUTPUT_DIR = str(REPO_ROOT / "examples" / "md17" / "benchmark_results")
+FT_CONFIG_PATH = str(REPO_ROOT / "examples" / "qm9" / "finetuning_config_energy.json")
+FT_CONFIG_ANI1X_PATH = str(REPO_ROOT / "examples" / "qm9" / "finetuning_config_energy_ani1x.json")
+DATASET_DIR = str(REPO_ROOT / "dataset" / "qm9_energy.pickle")
+OUTPUT_DIR = str(REPO_ROOT / "examples" / "qm9" / "benchmark_results")
 
-NUM_EPOCHS = 100
-WARMUP_EPOCHS = 20
-BACKBONE_LR_MULT = 0.1  # fine-tuning: backbone lr = base_lr * this
+NUM_EPOCHS = 10
+WARMUP_EPOCHS = 0
+BACKBONE_LR_MULT = 0.1
 BATCH_SIZE = 32
+
+# Per-strategy learning rates
+STRATEGY_LR = {
+    "scratch": 1e-3,
+    "unfrozen": 1e-3,
+    "frozen": 1e-3,
+    "ani1x_recycled": 1e-3,
+    "qm7x_recycled": 1e-3,
+}
 
 _DEFAULT_GRAPH_ATTR = torch.tensor([0.0, 1.0])
 
@@ -79,8 +85,6 @@ ARCH_DEFAULTS = {
     "node_max_ell": None, "avg_num_neighbors": None,
 }
 
-# Units: Dataset is stored in eV (energy) and eV/Å (forces) after preprocessing.
-# Conversion factor for reporting in kcal/mol alongside eV.
 KCAL_PER_EV = 23.0609
 
 
@@ -132,8 +136,11 @@ def make_dataloaders(ft_config):
     return hydragnn.preprocess.create_dataloaders(trainset, valset, testset, BATCH_SIZE)
 
 
+# ---------------------------------------------------------------------------
+# Model constructors
+# ---------------------------------------------------------------------------
 def build_model_from_pretrained(pretrained_config, ft_config, freeze=False):
-    """Build model from pretrained backbone, swap to single MLIP head."""
+    """Build model from pretrained backbone, swap to single energy head."""
     model = hydragnn.models.create_model_config(
         config=pretrained_config["NeuralNetwork"], verbosity=0,
     )
@@ -145,18 +152,10 @@ def build_model_from_pretrained(pretrained_config, ft_config, freeze=False):
         path=os.path.dirname(PRETRAINED_DIR),
     )
 
-    # Unwrap from DDP, swap heads, optionally freeze
     model = model.module
     model = _update_model(model, ft_config)
     if freeze:
         model._freeze_conv()
-
-    # Propagate MLIP loss weights from ft_config into the wrapper
-    arch = ft_config["NeuralNetwork"]["Architecture"]
-    if hasattr(model, "energy_weight"):
-        model.energy_weight = arch.get("energy_weight", 1.0)
-        model.energy_peratom_weight = arch.get("energy_peratom_weight", 0.0)
-        model.force_weight = arch.get("force_weight", 100.0)
 
     return model
 
@@ -167,26 +166,18 @@ def build_scratch_model(pretrained_config, ft_config):
         config=pretrained_config["NeuralNetwork"], verbosity=0,
     )
     model = _update_model(model, ft_config)
-
-    arch = ft_config["NeuralNetwork"]["Architecture"]
-    if hasattr(model, "energy_weight"):
-        model.energy_weight = arch.get("energy_weight", 1.0)
-        model.energy_peratom_weight = arch.get("energy_peratom_weight", 0.0)
-        model.force_weight = arch.get("force_weight", 100.0)
-
     return model
 
 
-ANI1X_BRANCH = 1  # branch-1 = ANI1x in the pretrained 16-head model
+ANI1X_BRANCH = 1   # branch-1  = ANI1x in the pretrained 16-head model
+QM7X_BRANCH  = 14  # branch-14 = QM7X  in the pretrained 16-head model
+
+BRANCH_LABEL = {ANI1X_BRANCH: "ANI1x", QM7X_BRANCH: "QM7X"}
 
 
-def build_model_with_recycled_head(pretrained_config, ft_config, source_branch=ANI1X_BRANCH, freeze=False):
-    """Build model from pretrained backbone, recycling the ANI1x head (branch-1).
-
-    Instead of creating a random head, this copies the pretrained shared layers
-    and head layers from the source branch into branch-0 of the fine-tuning model.
-    The ft_config must have dim_pretrained/dim_headlayers matching the original head.
-    """
+def build_model_with_recycled_head(pretrained_config, ft_config,
+                                   source_branch=ANI1X_BRANCH, freeze=False):
+    """Build model from pretrained backbone, recycling a specific head."""
     model = hydragnn.models.create_model_config(
         config=pretrained_config["NeuralNetwork"], verbosity=0,
     )
@@ -198,16 +189,11 @@ def build_model_with_recycled_head(pretrained_config, ft_config, source_branch=A
         path=os.path.dirname(PRETRAINED_DIR),
     )
 
-    # Unwrap from DDP
     model = model.module
 
-    # Save the source branch module state_dicts before update_model replaces heads
     src_tag = f"branch-{source_branch}"
-
-    # graph_shared is a ModuleDict keyed by branch type
     saved_shared_state = model.graph_shared[src_tag].state_dict()
 
-    # heads_NN is a ModuleList of ModuleDicts; find the one with our source branch
     saved_head_state = None
     for head_dict in model.heads_NN:
         if src_tag in head_dict:
@@ -216,13 +202,12 @@ def build_model_with_recycled_head(pretrained_config, ft_config, source_branch=A
 
     n_shared = sum(1 for _ in saved_shared_state)
     n_head = sum(1 for _ in saved_head_state) if saved_head_state else 0
-    print(f"  Recycling pretrained {src_tag} (ANI1x) → branch-0")
+    label = BRANCH_LABEL.get(source_branch, f"branch-{source_branch}")
+    print(f"  Recycling pretrained {src_tag} ({label}) → branch-0")
     print(f"    Saved {n_shared} shared params, {n_head} head params")
 
-    # Replace heads with matching architecture (dim_pretrained=50, dim_headlayers=[776,776])
     model = _update_model(model, ft_config)
 
-    # Copy saved weights into the new branch-0 modules directly
     with torch.no_grad():
         model.graph_shared["branch-0"].load_state_dict(saved_shared_state)
         if saved_head_state is not None:
@@ -231,13 +216,6 @@ def build_model_with_recycled_head(pretrained_config, ft_config, source_branch=A
     if freeze:
         model._freeze_conv()
 
-    # Propagate MLIP loss weights
-    arch = ft_config["NeuralNetwork"]["Architecture"]
-    if hasattr(model, "energy_weight"):
-        model.energy_weight = arch.get("energy_weight", 1.0)
-        model.energy_peratom_weight = arch.get("energy_peratom_weight", 0.0)
-        model.force_weight = arch.get("force_weight", 100.0)
-
     return model
 
 
@@ -245,8 +223,7 @@ def build_model_with_recycled_head(pretrained_config, ft_config, source_branch=A
 # Optimizer / Scheduler helpers
 # ---------------------------------------------------------------------------
 def make_param_groups(model, base_lr, strategy):
-    """Create optimizer param groups with optional differential lr."""
-    use_differential = False  # uniform LR for all strategies
+    use_differential = False
 
     if strategy == "frozen":
         return [{"params": [p for p in model.parameters() if p.requires_grad],
@@ -275,7 +252,6 @@ def make_param_groups(model, base_lr, strategy):
 
 
 def make_scheduler(optimizer, num_epochs, warmup_epochs):
-    """Linear warmup then cosine annealing to near-zero."""
     warmup = torch.optim.lr_scheduler.LinearLR(
         optimizer, start_factor=0.01, end_factor=1.0, total_iters=warmup_epochs,
     )
@@ -288,21 +264,15 @@ def make_scheduler(optimizer, num_epochs, warmup_epochs):
 
 
 # ---------------------------------------------------------------------------
-# Training loop with energy + force loss
+# Training loop — energy only (MAE loss)
 # ---------------------------------------------------------------------------
 def train_loop(model, train_loader, val_loader, num_epochs, optimizer, precision,
                scheduler=None):
-    """Train with energy_force_loss, return per-epoch metrics dict.
-
-    Returns dict with keys:
-      energy_mae, force_mae  (validation, per epoch)
-    """
     prec, param_dtype, _ = resolve_precision(precision)
     autocast_ctx, scaler = get_autocast_and_scaler(prec)
     device = get_device()
 
     energy_mae_hist = []
-    force_mae_hist = []
 
     for epoch in range(num_epochs):
         os.environ["HYDRAGNN_EPOCH"] = str(epoch)
@@ -314,14 +284,14 @@ def train_loop(model, train_loader, val_loader, num_epochs, optimizer, precision
             batch = _force_dataset_name_2d(batch)
             batch = _ensure_graph_attr(batch)
             batch = move_batch_to_device(batch, param_dtype)
-            # Enable grad on positions for force computation
-            batch.pos.requires_grad_(True)
 
             optimizer.zero_grad(set_to_none=True)
             with autocast_ctx:
                 pred = model(batch)
-                loss_owner = model.module if hasattr(model, "module") else model
-                loss, tasks_loss = loss_owner.energy_force_loss(pred, batch)
+                # pred is a list; pred[0] = [B, 1] for graph-level head
+                e_pred = pred[0].view(-1)
+                e_true = batch.y.view(-1).to(e_pred.dtype)
+                loss = F.l1_loss(e_pred, e_true)
 
             if scaler is not None:
                 scaler.scale(loss).backward()
@@ -337,129 +307,81 @@ def train_loop(model, train_loader, val_loader, num_epochs, optimizer, precision
 
         # ---------- Validate ----------
         model.eval()
-        all_energy_pred = []
-        all_energy_true = []
-        all_force_pred = []
-        all_force_true = []
+        all_pred = []
+        all_true = []
+        all_natoms = []
 
-        for batch in val_loader:
-            batch = _force_dataset_name_2d(batch)
-            batch = _ensure_graph_attr(batch)
-            batch = move_batch_to_device(batch, param_dtype)
-            batch.pos.requires_grad_(True)
+        with torch.no_grad():
+            for batch in val_loader:
+                batch = _force_dataset_name_2d(batch)
+                batch = _ensure_graph_attr(batch)
+                batch = move_batch_to_device(batch, param_dtype)
 
-            with torch.enable_grad():
                 pred = model(batch)
+                e_pred = pred[0].view(-1).float()
+                e_true = batch.y.view(-1).float()
 
-                # Extract graph energy
-                loss_owner = model.module if hasattr(model, "module") else model
-                if loss_owner.head_type[0] == "graph":
-                    if isinstance(pred, (list, tuple)):
-                        e_pred = pred[0].squeeze().float()
-                    else:
-                        e_pred = pred.squeeze().float()
-                else:
-                    import torch_scatter
-                    e_pred = torch_scatter.scatter_add(
-                        pred[0], batch.batch, dim=0
-                    ).squeeze().float()
+                # Number of atoms per graph in batch
+                natoms = torch.bincount(batch.batch).float()
 
-                e_true = batch.energy.squeeze().float()
+                all_pred.append(e_pred.cpu())
+                all_true.append(e_true.cpu())
+                all_natoms.append(natoms.cpu())
 
-                # Compute forces via autograd
-                f_pred = torch.autograd.grad(
-                    e_pred, batch.pos,
-                    grad_outputs=torch.ones_like(e_pred),
-                    retain_graph=False, create_graph=False,
-                )[0].float()
-                f_pred = -f_pred
+        all_pred = torch.cat(all_pred)
+        all_true = torch.cat(all_true)
+        all_natoms = torch.cat(all_natoms)
 
-            f_true = batch.forces.float()
-
-            all_energy_pred.append(e_pred.detach().cpu())
-            all_energy_true.append(e_true.detach().cpu())
-            all_force_pred.append(f_pred.detach().cpu())
-            all_force_true.append(f_true.detach().cpu())
-
-        all_energy_pred = torch.cat(all_energy_pred)
-        all_energy_true = torch.cat(all_energy_true)
-        all_force_pred = torch.cat(all_force_pred)
-        all_force_true = torch.cat(all_force_true)
-
-        energy_mae = float((all_energy_pred - all_energy_true).abs().mean())
-        force_mae = float((all_force_pred - all_force_true).abs().mean())
-
+        # Per-atom MAE: |E_pred - E_true| / N_atoms, averaged over samples
+        peratom_ae = (all_pred - all_true).abs() / all_natoms
+        energy_mae = float(peratom_ae.mean())
         energy_mae_hist.append(energy_mae)
-        force_mae_hist.append(force_mae)
 
         if scheduler is not None:
             scheduler.step()
 
         if (epoch + 1) % 10 == 0 or epoch == 0:
-            lr_parts = " ".join(f"lr{i}={pg['lr']:.2e}" for i, pg in enumerate(optimizer.param_groups))
+            lr_parts = " ".join(
+                f"lr{i}={pg['lr']:.2e}" for i, pg in enumerate(optimizer.param_groups)
+            )
             print(
                 f"    Epoch {epoch+1:4d}/{num_epochs}"
-                f"  Loss: {mean_train_loss:.4f}"
-                f"  Val E-MAE: {energy_mae:.4f} eV ({energy_mae * KCAL_PER_EV:.4f} kcal/mol)"
-                f"  Val F-MAE: {force_mae:.4f} eV/Å ({force_mae * KCAL_PER_EV:.4f} kcal/(mol·Å))"
+                f"  Loss: {mean_train_loss:.6f}"
+                f"  Val E-MAE: {energy_mae:.6f} eV/atom"
+                f"  ({energy_mae * KCAL_PER_EV:.4f} kcal/(mol·atom))"
                 f"  [{lr_parts}]"
             )
 
-    return {"energy_mae": energy_mae_hist, "force_mae": force_mae_hist}
+    return {"energy_mae": energy_mae_hist}
 
 
-def evaluate_ef(model, loader, param_dtype):
-    """Run energy + force inference over a loader; return (energy_mae, force_mae) in eV / eV/A."""
+def evaluate_energy(model, loader, param_dtype):
+    """Run energy inference over a loader; return per-atom energy MAE (eV/atom)."""
     model.eval()
-    all_energy_pred = []
-    all_energy_true = []
-    all_force_pred = []
-    all_force_true = []
+    all_pred = []
+    all_true = []
+    all_natoms = []
 
-    for batch in loader:
-        batch = _force_dataset_name_2d(batch)
-        batch = _ensure_graph_attr(batch)
-        batch = move_batch_to_device(batch, param_dtype)
-        batch.pos.requires_grad_(True)
+    with torch.no_grad():
+        for batch in loader:
+            batch = _force_dataset_name_2d(batch)
+            batch = _ensure_graph_attr(batch)
+            batch = move_batch_to_device(batch, param_dtype)
 
-        with torch.enable_grad():
             pred = model(batch)
-            loss_owner = model.module if hasattr(model, "module") else model
-            if loss_owner.head_type[0] == "graph":
-                if isinstance(pred, (list, tuple)):
-                    e_pred = pred[0].squeeze().float()
-                else:
-                    e_pred = pred.squeeze().float()
-            else:
-                import torch_scatter
-                e_pred = torch_scatter.scatter_add(
-                    pred[0], batch.batch, dim=0
-                ).squeeze().float()
+            e_pred = pred[0].view(-1).float()
+            e_true = batch.y.view(-1).float()
+            natoms = torch.bincount(batch.batch).float()
 
-            e_true = batch.energy.squeeze().float()
+            all_pred.append(e_pred.cpu())
+            all_true.append(e_true.cpu())
+            all_natoms.append(natoms.cpu())
 
-            f_pred = torch.autograd.grad(
-                e_pred, batch.pos,
-                grad_outputs=torch.ones_like(e_pred),
-                retain_graph=False, create_graph=False,
-            )[0].float()
-            f_pred = -f_pred
-
-        f_true = batch.forces.float()
-
-        all_energy_pred.append(e_pred.detach().cpu())
-        all_energy_true.append(e_true.detach().cpu())
-        all_force_pred.append(f_pred.detach().cpu())
-        all_force_true.append(f_true.detach().cpu())
-
-    all_energy_pred = torch.cat(all_energy_pred)
-    all_energy_true = torch.cat(all_energy_true)
-    all_force_pred = torch.cat(all_force_pred)
-    all_force_true = torch.cat(all_force_true)
-
-    energy_mae = float((all_energy_pred - all_energy_true).abs().mean())
-    force_mae = float((all_force_pred - all_force_true).abs().mean())
-    return energy_mae, force_mae
+    all_pred = torch.cat(all_pred)
+    all_true = torch.cat(all_true)
+    all_natoms = torch.cat(all_natoms)
+    peratom_ae = (all_pred - all_true).abs() / all_natoms
+    return float(peratom_ae.mean())
 
 
 # ---------------------------------------------------------------------------
@@ -471,28 +393,32 @@ def run_experiment(strategy, ft_config, pretrained_config, train_loader, val_loa
     prec, param_dtype, _ = resolve_precision(precision)
 
     print(f"\n{'='*60}")
-    print(f"  Strategy: {strategy}  |  MLIP (energy + forces)")
+    print(f"  Strategy: {strategy}  |  Energy only (total, eV; reported per-atom)")
     print(f"{'='*60}")
 
     if strategy in ("frozen", "unfrozen"):
         freeze = (strategy == "frozen")
         model = build_model_from_pretrained(pretrained_config, ft_config, freeze=freeze)
     elif strategy == "ani1x_recycled":
-        model = build_model_with_recycled_head(pretrained_config, ft_config, freeze=False)
+        model = build_model_with_recycled_head(pretrained_config, ft_config,
+                                               source_branch=ANI1X_BRANCH, freeze=False)
+    elif strategy == "qm7x_recycled":
+        model = build_model_with_recycled_head(pretrained_config, ft_config,
+                                               source_branch=QM7X_BRANCH, freeze=False)
     else:
         model = build_scratch_model(pretrained_config, ft_config)
 
     model = model.to(dtype=param_dtype)
     model = get_distributed_model_find_unused(model, verbosity=0)
 
-    lr = ft_config["NeuralNetwork"]["Training"]["Optimizer"]["learning_rate"]
+    lr = STRATEGY_LR.get(strategy, ft_config["NeuralNetwork"]["Training"]["Optimizer"]["learning_rate"])
     wd = ft_config["NeuralNetwork"]["Training"]["Optimizer"].get("weight_decay", 0.0)
 
     param_groups = make_param_groups(model, lr, strategy)
     optimizer = torch.optim.AdamW(param_groups, weight_decay=wd)
-    scheduler = make_scheduler(optimizer, NUM_EPOCHS, WARMUP_EPOCHS)
 
-    print(f"    Scheduler: warmup {WARMUP_EPOCHS} epochs → constant lr for {NUM_EPOCHS - WARMUP_EPOCHS} epochs")
+    scheduler = None
+    print(f"    Scheduler: constant lr={lr:.1e} for {NUM_EPOCHS} epochs")
 
     _train_t0 = time.perf_counter()
     history = train_loop(model, train_loader, val_loader, NUM_EPOCHS, optimizer,
@@ -501,10 +427,8 @@ def run_experiment(strategy, ft_config, pretrained_config, train_loader, val_loa
 
     best_e = min(history["energy_mae"])
     best_e_ep = history["energy_mae"].index(best_e) + 1
-    best_f = min(history["force_mae"])
-    best_f_ep = history["force_mae"].index(best_f) + 1
-    print(f"  Best Val Energy MAE: {best_e:.4f} eV  ({best_e * KCAL_PER_EV:.4f} kcal/mol) at epoch {best_e_ep}")
-    print(f"  Best Val Force  MAE: {best_f:.4f} eV/Å ({best_f * KCAL_PER_EV:.4f} kcal/(mol·Å)) at epoch {best_f_ep}")
+    print(f"  Best Val Energy MAE: {best_e:.6f} eV/atom"
+          f"  ({best_e * KCAL_PER_EV:.4f} kcal/(mol·atom)) at epoch {best_e_ep}")
     print(f"  Training wall-clock : {training_wall_sec:.1f} s")
 
     history["training_wall_sec"] = training_wall_sec
@@ -512,13 +436,12 @@ def run_experiment(strategy, ft_config, pretrained_config, train_loader, val_loa
     # ---------- Timed test-set inference ----------
     if test_loader is not None:
         _infer_t0 = time.perf_counter()
-        test_e_mae, test_f_mae = evaluate_ef(model, test_loader, param_dtype)
+        test_e_mae = evaluate_energy(model, test_loader, param_dtype)
         inference_wall_sec = time.perf_counter() - _infer_t0
-        print(f"  Test  Energy MAE    : {test_e_mae:.4f} eV  ({test_e_mae * KCAL_PER_EV:.4f} kcal/mol)")
-        print(f"  Test  Force  MAE    : {test_f_mae:.4f} eV/Å ({test_f_mae * KCAL_PER_EV:.4f} kcal/(mol·Å))")
+        print(f"  Test  Energy MAE    : {test_e_mae:.6f} eV/atom"
+              f"  ({test_e_mae * KCAL_PER_EV:.4f} kcal/(mol·atom))")
         print(f"  Inference wall-clock: {inference_wall_sec:.2f} s")
-        history["test_energy_mae_eV"] = test_e_mae
-        history["test_force_mae_eV_A"] = test_f_mae
+        history["test_energy_mae_eV_atom"] = test_e_mae
         history["inference_wall_sec"] = inference_wall_sec
 
     return history
@@ -533,31 +456,32 @@ def plot_curves(results, output_dir):
         "unfrozen": "Fine-tuning (unfrozen)",
         "scratch": "From scratch",
         "ani1x_recycled": "ANI1x head recycled",
+        "qm7x_recycled": "QM7X head recycled",
     }
-    colors = {"frozen": "#1f77b4", "unfrozen": "#ff7f0e", "scratch": "#2ca02c", "ani1x_recycled": "#d62728"}
+    colors = {
+        "frozen": "#1f77b4", "unfrozen": "#ff7f0e",
+        "scratch": "#2ca02c", "ani1x_recycled": "#d62728",
+        "qm7x_recycled": "#9467bd",
+    }
 
-    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+    fig, ax = plt.subplots(1, 1, figsize=(8, 5))
 
-    for ax, metric, ylabel in zip(
-        axes,
-        ("energy_mae", "force_mae"),
-        ("Energy MAE (eV)", "Force MAE (eV/Å)"),
-    ):
-        for strategy in ("frozen", "unfrozen", "scratch", "ani1x_recycled"):
-            if strategy not in results:
-                continue
-            hist = results[strategy][metric]
-            epochs = list(range(1, len(hist) + 1))
-            ax.plot(epochs, hist, label=labels[strategy], color=colors[strategy], lw=1.2)
-        ax.set_xlabel("Epoch", fontsize=13)
-        ax.set_ylabel(ylabel, fontsize=13)
-        ax.xaxis.set_major_locator(MaxNLocator(integer=True))
-        ax.legend(fontsize=10)
-        ax.grid(True, alpha=0.3)
+    for strategy in ("frozen", "unfrozen", "scratch", "ani1x_recycled", "qm7x_recycled"):
+        if strategy not in results:
+            continue
+        hist = results[strategy]["energy_mae"]
+        epochs = list(range(1, len(hist) + 1))
+        ax.plot(epochs, hist, label=labels[strategy], color=colors[strategy], lw=1.2)
 
-    fig.suptitle("MD17 Uracil MLIP — Energy + Force Training", fontsize=14)
+    ax.set_xlabel("Epoch", fontsize=13)
+    ax.set_ylabel("Energy MAE (eV/atom)", fontsize=13)
+    ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+    ax.legend(fontsize=10)
+    ax.grid(True, alpha=0.3)
+
+    fig.suptitle("QM9 — Per-atom Atomization Energy", fontsize=14)
     fig.tight_layout()
-    plot_path = os.path.join(output_dir, "md17_mlip_validation.png")
+    plot_path = os.path.join(output_dir, "qm9_energy_validation.png")
     fig.savefig(plot_path, dpi=150)
     print(f"\nPlot saved to {plot_path}")
     plt.close(fig)
@@ -570,7 +494,6 @@ def main():
     world_size, world_rank = setup_ddp()
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    # Use ANI1x config for ALL strategies so head architecture is identical
     ft_config_template = load_ft_config_ani1x()
     pretrained_config = load_pretrained_config()
 
@@ -578,7 +501,7 @@ def main():
         copy.deepcopy(ft_config_template)
     )
 
-    strategies = ["scratch", "unfrozen", "ani1x_recycled", "frozen"]
+    strategies = ["scratch", "unfrozen", "ani1x_recycled", "qm7x_recycled", "frozen"]
     results = {}
 
     for strategy in strategies:
@@ -592,21 +515,16 @@ def main():
     summary = {}
     for strategy, hist in results.items():
         best_e = min(hist["energy_mae"])
-        best_f = min(hist["force_mae"])
         summary[strategy] = {
-            "best_energy_mae_eV": best_e,
-            "best_energy_mae_kcal_mol": best_e * KCAL_PER_EV,
+            "best_energy_mae_eV_atom": best_e,
+            "best_energy_mae_kcal_mol_atom": best_e * KCAL_PER_EV,
             "best_energy_epoch": hist["energy_mae"].index(best_e) + 1,
-            "best_force_mae_eV_A": best_f,
-            "best_force_mae_kcal_mol_A": best_f * KCAL_PER_EV,
-            "best_force_epoch": hist["force_mae"].index(best_f) + 1,
             "training_wall_sec": round(hist.get("training_wall_sec", 0.0), 2),
             "inference_wall_sec": (
                 round(hist["inference_wall_sec"], 2)
                 if "inference_wall_sec" in hist else None
             ),
-            "test_energy_mae_eV": hist.get("test_energy_mae_eV"),
-            "test_force_mae_eV_A": hist.get("test_force_mae_eV_A"),
+            "test_energy_mae_eV_atom": hist.get("test_energy_mae_eV_atom"),
         }
 
     summary_path = os.path.join(OUTPUT_DIR, "benchmark_summary.json")
@@ -622,18 +540,15 @@ def main():
     plot_curves(results, OUTPUT_DIR)
 
     # Print table
-    print(f"\n{'Strategy':<18s}  {'E-MAE (eV)':>10s}  {'E-MAE (kcal/mol)':>17s}  {'Ep':>4s}  {'F-MAE (eV/Å)':>13s}  {'F-MAE (kcal/(mol·Å))':>21s}  {'Ep':>4s}")
-    print("-" * 100)
+    print(f"\n{'Strategy':<18s}  {'E-MAE (eV/atom)':>15s}  {'E-MAE (kcal/(mol·atom))':>24s}  {'Ep':>4s}")
+    print("-" * 68)
     for strategy in strategies:
         s = summary[strategy]
         print(
             f"{strategy:<18s}"
-            f"  {s['best_energy_mae_eV']:10.4f}"
-            f"  {s['best_energy_mae_kcal_mol']:17.4f}"
+            f"  {s['best_energy_mae_eV_atom']:15.6f}"
+            f"  {s['best_energy_mae_kcal_mol_atom']:24.4f}"
             f"  {s['best_energy_epoch']:4d}"
-            f"  {s['best_force_mae_eV_A']:13.4f}"
-            f"  {s['best_force_mae_kcal_mol_A']:21.4f}"
-            f"  {s['best_force_epoch']:4d}"
         )
 
 

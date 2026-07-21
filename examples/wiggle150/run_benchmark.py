@@ -5,7 +5,7 @@ across BF16, FP32, and FP64 precisions on the Wiggle150 dataset.
 Generates a validation-MAE-vs-epoch plot for FP64 runs.
 """
 
-import sys, os, json, copy
+import sys, os, json, copy, time
 from pathlib import Path
 
 # Ensure project roots are on the path
@@ -239,7 +239,34 @@ def train_loop(model, train_loader, val_loader, num_epochs, optimizer, precision
     return {"mae": mae_history, "rmse": rmse_history}
 
 
-def run_experiment(strategy, precision_name, ft_config, pretrained_config, train_loader, val_loader):
+def evaluate_mae(model, loader, param_dtype, prec):
+    """Run inference over a loader; return (mae, rmse) in eV for head-0 predictions."""
+    autocast_ctx, _ = get_autocast_and_scaler(prec)
+    model.eval()
+    all_pred = []
+    all_true = []
+    with torch.no_grad():
+        for batch in loader:
+            batch = _force_dataset_name_2d(batch)
+            batch = _ensure_graph_attr(batch)
+            batch = move_batch_to_device(batch, param_dtype)
+
+            head_index = get_head_indices(model, batch)
+            with autocast_ctx:
+                pred = model(batch)
+            head_pred = pred[0].detach().cpu().float().view(-1)
+            head_true = batch.y[head_index[0]].detach().cpu().float().view(-1)
+            all_pred.append(head_pred)
+            all_true.append(head_true)
+
+    all_pred = torch.cat(all_pred)
+    all_true = torch.cat(all_true)
+    errors = all_pred - all_true
+    return float(errors.abs().mean()), float((errors**2).mean().sqrt())
+
+
+def run_experiment(strategy, precision_name, ft_config, pretrained_config, train_loader, val_loader,
+                   test_loader=None):
     """Run a single (strategy, precision) experiment. Returns val_history list."""
     prec, param_dtype, _ = resolve_precision(precision_name)
     print(f"\n{'='*60}")
@@ -272,7 +299,9 @@ def run_experiment(strategy, precision_name, ft_config, pretrained_config, train
 
     optimizer = torch.optim.AdamW(params, lr=lr, weight_decay=wd)
 
+    _train_t0 = time.perf_counter()
     history = train_loop(model, train_loader, val_loader, NUM_EPOCHS, optimizer, prec)
+    training_wall_sec = time.perf_counter() - _train_t0
 
     best_mae = min(history["mae"])
     best_mae_epoch = history["mae"].index(best_mae) + 1
@@ -282,6 +311,20 @@ def run_experiment(strategy, precision_name, ft_config, pretrained_config, train
         f"  Best Val MAE:  {best_mae:.4f} eV ({best_mae * KCAL_PER_EV:.2f} kcal/mol) at epoch {best_mae_epoch}\n"
         f"  Best Val RMSE: {best_rmse:.4f} eV ({best_rmse * KCAL_PER_EV:.2f} kcal/mol) at epoch {best_rmse_epoch}"
     )
+    print(f"  Training wall-clock : {training_wall_sec:.1f} s")
+
+    history["training_wall_sec"] = training_wall_sec
+
+    # ---------- Timed test-set inference ----------
+    if test_loader is not None:
+        _infer_t0 = time.perf_counter()
+        test_mae, test_rmse = evaluate_mae(model, test_loader, param_dtype, prec)
+        inference_wall_sec = time.perf_counter() - _infer_t0
+        print(f"  Test  MAE:     {test_mae:.4f} eV ({test_mae * KCAL_PER_EV:.2f} kcal/mol)")
+        print(f"  Inference wall-clock: {inference_wall_sec:.2f} s")
+        history["test_mae_eV"] = test_mae
+        history["test_rmse_eV"] = test_rmse
+        history["inference_wall_sec"] = inference_wall_sec
 
     return history
 
@@ -351,6 +394,7 @@ def main():
             val_history = run_experiment(
                 strategy, prec_name, ft_config, pretrained_config,
                 train_loader, val_loader,
+                test_loader=test_loader,
             )
             results[key] = val_history
 
@@ -370,6 +414,13 @@ def main():
             "best_val_rmse_kcal_mol": best_rmse * KCAL_PER_EV,
             "final_val_mae_eV": mae_list[-1],
             "final_val_rmse_eV": rmse_list[-1],
+            "training_wall_sec": round(hist.get("training_wall_sec", 0.0), 2),
+            "inference_wall_sec": (
+                round(hist["inference_wall_sec"], 2)
+                if "inference_wall_sec" in hist else None
+            ),
+            "test_mae_eV": hist.get("test_mae_eV"),
+            "test_rmse_eV": hist.get("test_rmse_eV"),
         }
     summary_path = os.path.join(OUTPUT_DIR, "benchmark_summary.json")
     with open(summary_path, "w") as f:
