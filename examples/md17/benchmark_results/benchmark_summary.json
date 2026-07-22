@@ -1,18 +1,50 @@
 {
-  "frozen": {
-    "best_energy_mae_eV": 0.1852787882089615,
-    "best_energy_mae_kcal_mol": 4.27269560700804,
-    "best_energy_epoch": 97,
-    "best_force_mae_eV_A": 0.5921499729156494,
-    "best_force_mae_kcal_mol_A": 13.6555113104105,
-    "best_force_epoch": 95
+  "scratch": {
+    "best_energy_mae_eV": 0.11787641048431396,
+    "best_energy_mae_kcal_mol": 2.718336114537716,
+    "best_energy_epoch": 99,
+    "best_force_mae_eV_A": 0.3075835406780243,
+    "best_force_mae_kcal_mol_A": 7.0931532732218505,
+    "best_force_epoch": 98,
+    "training_wall_sec": 274.66,
+    "inference_wall_sec": 0.21,
+    "test_energy_mae_eV": 0.1457875519990921,
+    "test_force_mae_eV_A": 0.4063020348548889
   },
   "unfrozen": {
-    "best_energy_mae_eV": 0.06407544016838074,
-    "best_energy_mae_kcal_mol": 1.4776373181790114,
+    "best_energy_mae_eV": 0.04492778331041336,
+    "best_energy_mae_kcal_mol": 1.0360751181431114,
     "best_energy_epoch": 100,
-    "best_force_mae_eV_A": 0.28373053669929504,
-    "best_force_mae_kcal_mol_A": 6.543081533768773,
-    "best_force_epoch": 92
+    "best_force_mae_eV_A": 0.15501827001571655,
+    "best_force_mae_kcal_mol_A": 3.5748608230054377,
+    "best_force_epoch": 99,
+    "training_wall_sec": 267.62,
+    "inference_wall_sec": 0.3,
+    "test_energy_mae_eV": 0.04378633573651314,
+    "test_force_mae_eV_A": 0.18054905533790588
+  },
+  "ani1x_recycled": {
+    "best_energy_mae_eV": 0.21765655279159546,
+    "best_energy_mae_kcal_mol": 5.0193559982717035,
+    "best_energy_epoch": 55,
+    "best_force_mae_eV_A": 0.7385183572769165,
+    "best_force_mae_kcal_mol_A": 17.030897985327243,
+    "best_force_epoch": 96,
+    "training_wall_sec": 388.86,
+    "inference_wall_sec": 0.29,
+    "test_energy_mae_eV": 0.25356218218803406,
+    "test_force_mae_eV_A": 0.7675113677978516
+  },
+  "frozen": {
+    "best_energy_mae_eV": 0.20958752930164337,
+    "best_energy_mae_kcal_mol": 4.833277054472267,
+    "best_energy_epoch": 79,
+    "best_force_mae_eV_A": 0.7092509865760803,
+    "best_force_mae_kcal_mol_A": 16.35596607633233,
+    "best_force_epoch": 51,
+    "training_wall_sec": 321.48,
+    "inference_wall_sec": 0.37,
+    "test_energy_mae_eV": 0.2336459904909134,
+    "test_force_mae_eV_A": 0.747251033782959
   }
 }
