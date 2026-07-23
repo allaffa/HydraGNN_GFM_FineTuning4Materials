@@ -87,6 +87,9 @@ class GraphBuilder:
             )
 
             data.pbc = [True, True, True] 
+            # Persist the lattice so downstream periodic foundation-model
+            # evaluators (UMA `omat`, MACE-MP) can reconstruct the crystal cell.
+            data.cell = torch.from_numpy(np.asarray(lattice)).float()
 
             # Generate Edges
             try:

@@ -58,6 +58,11 @@ Starting from these pre-trained weights, this repository provides a complete tra
 │       ├── run_benchmark.py          # Benchmark runner
 │       ├── benchmark_precision.py    # Precision benchmark utilities
 │       └── evaluate_checkpoint.py   # Checkpoint evaluation script
+├── frontier/                         # OLCF Frontier batch pipeline (see frontier/README.md)
+│   ├── env_frontier.sh               # Shared environment setup
+│   ├── build_mace_venv.sh            # Build the dedicated MACE venv
+│   ├── prefetch_models.sh            # Prefetch MACE/UMA weights (login node)
+│   └── submit_<dataset>.sbatch       # One comparison job per dataset
 └── utils/
     ├── __init__.py
     ├── ensemble_utils.py             # Core fine-tuning utilities
@@ -219,6 +224,30 @@ Each dataset under `examples/` follows the same pattern:
 | `oqmd` | Open Quantum Materials Database |
 | `qm9` | QM9 molecular property prediction (also supports energy-only configs) |
 | `wiggle150` | Wiggle150 benchmark dataset |
+
+## Frontier Comparison Pipeline (HydraGNN vs. MACE vs. UMA)
+
+The `frontier/` directory provides an OLCF **Frontier** batch pipeline that
+benchmarks the pretrained HydraGNN GFM ensemble against the **MACE** and **UMA**
+(fairchem) foundation models on the same datasets and splits, reporting both
+per-atom energy **MAE** and **wall-clock timing**.
+
+Each `frontier/submit_<dataset>.sbatch` job (for `md17`, `qm9`, `ms25`, `abc3`,
+`oqmd`, `wiggle150`) runs HydraGNN fine-tuning strategies, then MACE and UMA
+fine-tune + zero-shot benchmarks, and assembles a combined comparison table.
+
+```bash
+export REPO_ROOT=$PWD FRONTIER_ROCM=7.2.0 \
+       HYDRAGNN_VENV=$PWD/HydraGNN-Installation-Frontier-ROCm72/hydragnn_venv_rocm72 \
+       MACE_VENV=$PWD/HydraGNN-Installation-Frontier-ROCm72/mace_venv_rocm72
+sbatch frontier/submit_qm9.sbatch
+```
+
+See [`frontier/README.md`](frontier/README.md) for full details, including
+dataset acquisition, OLCF login-node network notes, the `mp-api`/`emmet-core`
+compatibility fix for the Materials Project client, and the UMA
+`--freeze-backbone` recommendation (full-model UMA fine-tuning on small splits
+caused catastrophic forgetting).
 
 ## Advanced Usage
 

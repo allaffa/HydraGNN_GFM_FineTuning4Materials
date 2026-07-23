@@ -4,3 +4,24 @@ __pycache__/*
 data_utils/__pycache__/*
 **.DS_Store
 HydraGNN/
+
+# --- Frontier comparison pipeline: local, machine-specific artifacts ---
+# Per-machine Python environments (built via frontier/build_mace_venv.sh, etc.)
+HydraGNN-Installation-*/
+# Downloaded / preprocessed datasets and raw data (built by *_preonly.py)
+dataset/
+examples/*/dataset/
+# Downloaded foundation-model weight caches
+mace_cache/
+uma_cache/
+# Pretrained GFM ensemble checkpoints (hundreds of MB, download via Globus)
+pretrained_model_ensemble/
+# Raw dataset tensors emitted by *_getData*.py
+*.pt
+# Run logs
+logs/
+examples/*/logs/
+# Python bytecode caches (any location)
+**/__pycache__/
+# Temporary / timestamped result backups
+examples/*/benchmark_results_*/

@@ -1,20 +1,26 @@
 #!/bin/bash
 # ---------------------------------------------------------------------------
-# Frontier batch job: full Wiggle150 (conformational energy) comparison
-# pipeline.  HydraGNN benchmark -> MACE fine-tune -> UMA fine-tune ->
-# zero-shot MACE/UMA benchmarks (accuracy + wall-clock timing per model).
+# Frontier batch job: OQMD (formation-energy) fine-tune comparison pipeline.
+#   HydraGNN fine-tune -> MACE fine-tune -> UMA fine-tune.
+#
+# OQMD targets formation energy per atom, so this is a *fine-tune only*
+# comparison (no meaningful zero-shot: foundation models are not referenced
+# to DFT formation enthalpies).
 #
 # Submit from the repo root:
 #   export HYDRAGNN_VENV=/lustre/orion/<proj>/.../hydragnn_venv
-#   sbatch frontier/submit_wiggle150.sbatch     # or: sbatch -A <PROJ> ...
+#   sbatch frontier/submit_oqmd.sbatch
 #
 # Prefetch model weights on a login node FIRST:  bash frontier/prefetch_models.sh
+# The dataset (dataset/oqmd.pickle) must be built first via
+#   python examples/oqmd/oqmd_getData.py
+# (rebuild if it predates the data.cell patch).
 # ---------------------------------------------------------------------------
 #SBATCH -A LRN070
-#SBATCH -J wig150_gfm
-#SBATCH -o logs/frontier/wiggle150-%j.out
-#SBATCH -e logs/frontier/wiggle150-%j.out
-#SBATCH -t 01:00:00
+#SBATCH -J oqmd_gfm
+#SBATCH -o logs/frontier/oqmd-%j.out
+#SBATCH -e logs/frontier/oqmd-%j.out
+#SBATCH -t 02:00:00
 #SBATCH -p batch
 #SBATCH -N 1
 
@@ -28,7 +34,6 @@ export MACE_VENV="${MACE_VENV:-${REPO_ROOT}/HydraGNN-Installation-Frontier-ROCm7
 
 source "${REPO_ROOT}/frontier/env_frontier.sh"
 
-# Abort the pipeline if any step below fails.
 set -euo pipefail
 
 SRUN="srun -N1 -n1 -c${OMP_NUM_THREADS} --gpus-per-task=1 --gpu-bind=closest"
@@ -37,28 +42,18 @@ SRUN="srun -N1 -n1 -c${OMP_NUM_THREADS} --gpus-per-task=1 --gpu-bind=closest"
 export HF_HUB_OFFLINE=1
 # MACE foundation .model files must deserialize with weights_only=False.
 export TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=1
-# MACE fine-tune/benchmark run in the dedicated e3nn-0.4.4 venv.
+# MACE fine-tune runs in the dedicated e3nn-0.4.4 venv.
 MACE_PY="${MACE_VENV}/bin/python"
 
-cd "${REPO_ROOT}/examples/wiggle150"
-RESULTS=benchmark_results
+echo "### [1/3] HydraGNN fine-tune"
+cd "${REPO_ROOT}"
+$SRUN python -u examples/oqmd/ensemble_fine_tune.py
 
-echo "### [1/5] HydraGNN benchmark"
-$SRUN python -u run_benchmark.py
-
-echo "### [2/5] MACE fine-tune"
+echo "### [2/3] MACE fine-tune"
+cd "${REPO_ROOT}/examples/oqmd"
 $SRUN "${MACE_PY}" -u run_mace_finetune.py --device cuda
 
-echo "### [3/5] UMA fine-tune"
+echo "### [3/3] UMA fine-tune"
 $SRUN python -u run_uma_finetune.py --device cuda --freeze-backbone
 
-echo "### [4/5] UMA zero-shot benchmark"
-$SRUN python -u run_uma_benchmark.py --device cuda \
-    --hydragnn-summary "${RESULTS}/benchmark_summary.json"
-
-echo "### [5/5] MACE zero-shot benchmark (final comparison table)"
-$SRUN "${MACE_PY}" -u run_mace_benchmark.py --device cuda \
-    --hydragnn-summary "${RESULTS}/benchmark_summary.json" \
-    --uma-summary "${RESULTS}/uma_benchmark_summary.json"
-
-echo "### Wiggle150 pipeline complete. Results in examples/wiggle150/${RESULTS}/"
+echo "### OQMD pipeline complete. Results in examples/oqmd/benchmark_results/"

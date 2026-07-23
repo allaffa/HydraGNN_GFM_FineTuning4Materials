@@ -33,9 +33,13 @@ echo "== Prefetching UMA checkpoint (uma-s-1p2) =="
 python - <<'PY'
 try:
     from fairchem.core import pretrained_mlip
-    pretrained_mlip.load_predict_unit("uma-s-1p2", device="cpu",
+    # load_predict_unit expects a *path*; resolve the registered model name to
+    # its cached checkpoint first (this triggers the HuggingFace download into
+    # $HF_HOME), exactly like utils/uma_calculator.py / utils/uma_finetune.py.
+    ckpt = pretrained_mlip.pretrained_checkpoint_path_from_name("uma-s-1p2")
+    pretrained_mlip.load_predict_unit(ckpt, device="cpu",
                                       inference_settings="default")
-    print("UMA prefetch done.")
+    print(f"UMA prefetch done. checkpoint={ckpt}")
 except Exception as exc:
     print(f"WARN: UMA prefetch failed: {exc}")
     print("If this is an auth error run: huggingface-cli login")

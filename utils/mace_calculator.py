@@ -79,6 +79,21 @@ MACE_MODELS: dict[str, dict] = {
         "level_of_theory": "ωB97M-VV10 (omol head)",
         "n_elements": 89,
     },
+    "mace_mp0_medium": {
+        "label": "MACE-MP-0 (medium)",
+        "family": "mace_mp",
+        "model": "medium",
+        "head": None,
+        # MACE-MP-0 is the inorganic/periodic materials foundation model
+        # (Materials Project trajectories, PBE+U).  Neutral bulk systems, so
+        # no charge/spin needs to be set.  This is the OMAT/materials-appropriate
+        # counterpart to the organic MACE-OFF / MACE-POLAR models above and is
+        # the recommended MACE baseline for periodic-crystal datasets.
+        "needs_charge_spin": False,
+        "training_data": "MPTraj (Materials Project)",
+        "level_of_theory": "PBE+U",
+        "n_elements": 89,
+    },
 }
 
 

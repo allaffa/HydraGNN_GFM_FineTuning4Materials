@@ -134,13 +134,28 @@ def pyg_data_to_ase_atoms(data, periodic: bool = False):
     pos = data.pos.detach().cpu().numpy().astype(np.float64)
     z = data.x[:, 0].detach().cpu().long().numpy()
 
+    # Normalise the per-axis periodic-boundary flags.  Different preprocessing
+    # scripts store ``data.pbc`` as a torch tensor, a numpy array, or a plain
+    # Python list ([True, True, True]); handle all of them uniformly.
+    pbc_flags = None
+    raw_pbc = getattr(data, "pbc", None)
+    if raw_pbc is not None:
+        if torch.is_tensor(raw_pbc):
+            pbc_flags = raw_pbc.detach().cpu().numpy().astype(bool).reshape(-1)
+        else:
+            pbc_flags = np.asarray(raw_pbc, dtype=bool).reshape(-1)
+
     cell = None
     pbc = False
 
-    if periodic or (hasattr(data, "pbc") and data.pbc is not None and data.pbc.any()):
+    if periodic or (pbc_flags is not None and bool(pbc_flags.any())):
         pbc = True
         if hasattr(data, "cell") and data.cell is not None:
-            c = data.cell.detach().cpu().numpy()
+            c = (
+                data.cell.detach().cpu().numpy()
+                if torch.is_tensor(data.cell)
+                else np.asarray(data.cell)
+            )
             cell = c.reshape(3, 3)
 
     atoms = Atoms(numbers=z, positions=pos, cell=cell, pbc=pbc)

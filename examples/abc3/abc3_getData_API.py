@@ -1,6 +1,18 @@
 import pandas as pd
 import torch
 from torch_geometric.data import Data
+
+# --- emmet-core >=0.85 compatibility shim -------------------------------
+# emmet-core moved ``BSPathType`` from ``emmet.core.electronic_structure`` to
+# ``emmet.core.band_theory``, but mp-api 0.41.2 still imports it from the old
+# location.  Re-expose it on the old module before importing mp_api so the
+# import in ``mprester.py`` succeeds without downgrading the shared venv.
+import emmet.core.electronic_structure as _emmet_es
+if not hasattr(_emmet_es, "BSPathType"):
+    from emmet.core.band_theory import BSPathType as _BSPathType
+    _emmet_es.BSPathType = _BSPathType
+# ------------------------------------------------------------------------
+
 from mp_api.client import MPRester  # pip install "mp-api == 0.41.2"
 import os
 import numpy as np
@@ -102,6 +114,9 @@ def create_dataset_from_csv():
 
         # Add periodic condition
         data.pbc = [True, True, True] 
+        # Persist the lattice so downstream periodic foundation-model
+        # evaluators (UMA `omat`, MACE-MP) can reconstruct the crystal cell.
+        data.cell = torch.tensor(structure.lattice.matrix, dtype=torch.float)
 
         # Turn positions -> Graph  
         try:

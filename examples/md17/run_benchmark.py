@@ -52,7 +52,7 @@ from utils.ensemble_utils import (
 # Constants
 # ---------------------------------------------------------------------------
 PRETRAINED_DIR = str(
-    REPO_ROOT / "pretrained_model_ensemble" / "OneDrive_1_4-7-2026"
+    REPO_ROOT / "pretrained_model_ensemble"
     / "multidataset_hpo-BEST6-fp64"
 )
 FT_CONFIG_PATH = str(REPO_ROOT / "examples" / "md17" / "finetuning_config_mlip.json")

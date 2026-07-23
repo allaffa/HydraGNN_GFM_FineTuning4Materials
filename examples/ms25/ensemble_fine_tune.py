@@ -31,7 +31,7 @@ def run_system(system, here, repo, scratch=False, freeze=False):
     args.log = None
     args.batch_size = None
     args.train_from_scratch = scratch
-    args.pretrained_model_ensemble_path = str((repo / "pretrained_model").resolve())
+    args.pretrained_model_ensemble_path = str((repo / "pretrained_model_ensemble").resolve())
     args.datasetname = f"{system}_{PICKLE_TAG}"
 
     if scratch:
@@ -85,7 +85,6 @@ if __name__ == "__main__":
     parser = build_arg_parser()
     parser.add_argument("--system", type=str, default=None)
     parser.add_argument("--scratch", action="store_true")
-    parser.add_argument("--freeze", action="store_true")
     args = parser.parse_args()
 
     here = Path(__file__).resolve().parent

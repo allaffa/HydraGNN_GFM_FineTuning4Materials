@@ -47,10 +47,11 @@ RESULTS_DIR = Path(__file__).parent / "benchmark_results"
 FINETUNE_MODEL_DIR = REPO_ROOT / "pretrained_model_ensemble" / "mace_finetuned" / "wiggle150"
 MACE_RUN_TRAIN = str(Path(sys.executable).parent / "mace_run_train")
 
+_CACHE = REPO_ROOT / "mace_cache" / "mace"
 CHECKPOINT_PATHS: dict[str, str] = {
-    "mace_off_medium": str(Path.home() / ".cache" / "mace" / "MACE-OFF23_medium.model"),
-    "mace_polar_m":    str(Path.home() / ".cache" / "mace" / "MACEPOLAR1Mmodel"),
-    "mace_mh1_omol":   str(Path.home() / ".cache" / "mace" / "macemh1model"),
+    "mace_off_medium": str(_CACHE / "MACE-OFF23_medium.model"),
+    "mace_polar_m":    str(_CACHE / "MACEPOLAR1Mmodel"),
+    "mace_mh1_omol":   str(_CACHE / "macemh1model"),
 }
 
 

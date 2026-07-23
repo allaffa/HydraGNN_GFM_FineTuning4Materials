@@ -26,7 +26,11 @@ if [[ ! -d "${REPO_ROOT}/examples" ]]; then
 fi
 
 # --- OLCF outbound proxy (needed for any on-node HTTP; harmless otherwise) --
-export all_proxy=socks://proxy.ccs.ornl.gov:3128/
+# NOTE: proxy.ccs.ornl.gov:3128 is an HTTP (squid) proxy.  all_proxy MUST use
+# the http:// scheme — httpx (used by huggingface_hub / fairchem) rejects a
+# bare "socks://" scheme with "Unknown scheme for proxy URL", which breaks UMA
+# checkpoint loading even when the weights are already cached locally.
+export all_proxy=http://proxy.ccs.ornl.gov:3128/
 export ftp_proxy=ftp://proxy.ccs.ornl.gov:3128/
 export http_proxy=http://proxy.ccs.ornl.gov:3128/
 export https_proxy=http://proxy.ccs.ornl.gov:3128/
@@ -48,8 +52,20 @@ if [[ -z "${HYDRAGNN_VENV:-}" ]]; then
     echo "ERROR: set HYDRAGNN_VENV to your conda/venv prefix before sourcing" >&2
     return 1 2>/dev/null || exit 1
 fi
-# `source activate` works for both conda envs and venvs created by miniforge.
-source activate "${HYDRAGNN_VENV}"
+# Activate the env.  Prefer sourcing conda.sh then `conda activate` (works in
+# non-interactive / batch shells where the bare `source activate` shim is not
+# on PATH); fall back to `source activate` for plain venvs.
+if [[ -n "${CONDA_EXE:-}" ]]; then
+    _conda_base="$(dirname "$(dirname "${CONDA_EXE}")")"
+    if [[ -f "${_conda_base}/etc/profile.d/conda.sh" ]]; then
+        source "${_conda_base}/etc/profile.d/conda.sh"
+    fi
+fi
+if command -v conda >/dev/null 2>&1; then
+    conda activate "${HYDRAGNN_VENV}"
+else
+    source activate "${HYDRAGNN_VENV}"
+fi
 
 # Make the repo (and HydraGNN) importable.
 export PYTHONPATH="${REPO_ROOT}:${REPO_ROOT}/HydraGNN:${PYTHONPATH:-}"
@@ -60,10 +76,15 @@ export MPICH_VERSION_DISPLAY=0
 export MIOPEN_DISABLE_CACHE=1
 export OMP_NUM_THREADS="${OMP_NUM_THREADS:-7}"
 export HYDRAGNN_NUM_WORKERS=0
-# Model caches (MACE + HuggingFace/fairchem) live under $HOME by default;
-# override to a project space if $HOME quota is tight.
-export HF_HOME="${HF_HOME:-$HOME/.cache/huggingface}"
-export MACE_CACHE="${MACE_CACHE:-$HOME/.cache/mace}"
+# Model caches live inside the repo (world-shared, visible to compute nodes),
+# at the same level as pretrained_model_ensemble/, instead of $HOME/.cache.
+#   UMA / fairchem download via HuggingFace  -> honours HF_HOME  (uma_cache/)
+#   fairchem checkpoint store (uma-s-1p2.pt) -> honours FAIRCHEM_CACHE_DIR
+#   MACE (mace-torch get_cache_dir)          -> honours XDG_CACHE_HOME -> <dir>/mace
+export HF_HOME="${HF_HOME:-$REPO_ROOT/uma_cache}"
+export FAIRCHEM_CACHE_DIR="${FAIRCHEM_CACHE_DIR:-$REPO_ROOT/uma_cache/fairchem}"
+export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$REPO_ROOT/mace_cache}"
+export MACE_CACHE="$XDG_CACHE_HOME/mace"
 
 echo "== Frontier environment =="
 which python

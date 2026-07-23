@@ -11,7 +11,7 @@ if __name__ == "__main__":
                         help="Freeze backbone (message passing layers).")
     args = parser.parse_args()
 
-    args.pretrained_model_ensemble_path = './pretrained_model'
+    args.pretrained_model_ensemble_path = './pretrained_model_ensemble_2026'
     args.datasetname = 'qm9'
 
     if args.train_from_scratch:
