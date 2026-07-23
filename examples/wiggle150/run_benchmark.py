@@ -65,7 +65,6 @@ def _ensure_graph_attr(batch):
 PRETRAINED_DIR = str(
     REPO_ROOT
     / "pretrained_model_ensemble"
-    / "OneDrive_1_4-7-2026"
     / "multidataset_hpo-BEST6-fp64"
 )
 FT_CONFIG_PATH = str(REPO_ROOT / "examples" / "wiggle150" / "finetuning_config.json")

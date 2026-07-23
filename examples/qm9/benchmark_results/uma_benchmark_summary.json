@@ -1,12 +1,13 @@
 {
   "model_name": "uma-s-1p2",
   "task_name": "omol",
-  "dataset": "/Users/7ml/Documents/Codes/HydraGNN_GFM_FineTuning4Materials/dataset/qm9_energy.pickle",
+  "dataset": "/lustre/orion/lrn070/world-shared/mlupopa/HydraGNN_GFM_FineTuning4Materials/dataset/qm9_energy.pickle",
   "testset": {
-    "n_structures": 19625,
-    "energy_per_atom_mae_eV": 3.1182097696989164,
-    "energy_per_atom_rmse_eV": 5.13122429620356,
-    "energy_per_atom_mae_kcal_mol": 71.90872367804974,
+    "n_structures": 147,
+    "inference_wall_sec": 16.73,
+    "energy_per_atom_mae_eV": 0.009938671970327799,
+    "energy_per_atom_rmse_eV": 0.014001428429193954,
+    "energy_per_atom_mae_kcal_mol": 0.22919472044053232,
     "note": "UMA total energy corrected by per-element linear reference energies (least-squares fit on evaluation split), divided by n_atoms, compared to QM9 per-atom atomization energy."
   }
 }

@@ -178,6 +178,8 @@ def parse_args():
     p.add_argument("--device", default="cpu")
     p.add_argument("--freeze-backbone", action="store_true",
                    help="Fine-tune only the output head (faster, more stable).")
+    p.add_argument("--tag", default=None,
+                   help="Variant tag; writes uma_finetuned_{tag}_summary.json and suffixes result keys.")
     p.add_argument("--seed", type=int, default=42)
     return p.parse_args()
 
@@ -212,7 +214,7 @@ def main():
     test_metrics = evaluate_split(model, calc, "testset")
 
     result = {
-        args.model_name: {
+        (f"{args.model_name} [{args.tag}]" if args.tag else args.model_name): {
             "model_name":        f"UMA {args.model_name} (fine-tuned)",
             "n_epochs":          args.epochs,
             "n_train":           len(train_atoms),
@@ -224,7 +226,11 @@ def main():
         }
     }
 
-    out_path = RESULTS_DIR / "uma_finetuned_summary.json"
+    _summary_name = (
+        f"uma_finetuned_{args.tag}_summary.json" if args.tag
+        else "uma_finetuned_summary.json"
+    )
+    out_path = RESULTS_DIR / _summary_name
     with open(out_path, "w") as fh:
         json.dump(result, fh, indent=2)
     print(f"\nResults saved to {out_path}")

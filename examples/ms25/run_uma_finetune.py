@@ -203,6 +203,8 @@ def parse_args():
     p.add_argument("--force-weight", type=float, default=10.0)
     p.add_argument("--device", default="cpu")
     p.add_argument("--freeze-backbone", action="store_true")
+    p.add_argument("--tag", default=None,
+                   help="Variant tag; writes uma_finetuned_{tag}_summary.json and suffixes result keys.")
     p.add_argument("--seed", type=int, default=42)
     return p.parse_args()
 
@@ -210,10 +212,15 @@ def parse_args():
 def main():
     args = parse_args()
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    out_path = RESULTS_DIR / "uma_finetuned_summary.json"
+    _summary_name = (
+        f"uma_finetuned_{args.tag}_summary.json" if args.tag
+        else "uma_finetuned_summary.json"
+    )
+    out_path = RESULTS_DIR / _summary_name
 
     all_results: dict = {}
     for system in args.systems:
+        _skey = f"{system} [{args.tag}]" if args.tag else system
         basedir = _dataset_dir(system)
         if not basedir.is_dir():
             print(f"[SKIP] {system}: dataset missing ({basedir})")
@@ -237,7 +244,7 @@ def main():
             )
         except Exception as exc:
             print(f"  ERROR during training: {exc}")
-            all_results[system] = {"model_name": f"UMA {args.model_name} (FT)",
+            all_results[_skey] = {"model_name": f"UMA {args.model_name} (FT)",
                                    "error": str(exc)}
             with open(out_path, "w") as fh:
                 json.dump(all_results, fh, indent=2)
@@ -246,7 +253,7 @@ def main():
         print(f"  Training done in {training_sec:.1f}s — evaluating …")
         test_metrics = evaluate_split(model, calc, system, "testset")
 
-        all_results[system] = {
+        all_results[_skey] = {
             "model_name": f"UMA {args.model_name} (FT)",
             "n_epochs": args.epochs,
             "n_train": len(train_atoms),

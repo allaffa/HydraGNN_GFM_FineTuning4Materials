@@ -1,0 +1,18 @@
+{
+  "uma-s-1p2": {
+    "model_name": "UMA uma-s-1p2 (fine-tuned)",
+    "n_epochs": 10,
+    "n_train": 682,
+    "lr": 0.0001,
+    "freeze_backbone": false,
+    "training_wall_sec": 5838.73,
+    "testset": {
+      "n_structures": 147,
+      "inference_wall_sec": 33.05,
+      "energy_per_atom_mae_eV": 0.7207394384176933,
+      "energy_per_atom_rmse_eV": 1.290941683602798,
+      "energy_per_atom_mae_kcal_mol": 16.620900115406585,
+      "note": "UMA total energy corrected by per-element linear reference energies (least-squares fit on evaluation split), divided by n_atoms, compared to QM9 per-atom atomization energy."
+    }
+  }
+}

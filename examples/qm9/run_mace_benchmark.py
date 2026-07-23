@@ -416,11 +416,18 @@ def main():
         with open(ft_mace_path) as f:
             mace_finetuned = json.load(f)
 
+    # Merge every UMA fine-tune summary (e.g. tagged full-FT + frozen variants)
+    # so each appears as its own row in the comparison table.
     uma_finetuned = None
-    ft_uma_path = os.path.join(args.output_dir, "uma_finetuned_summary.json")
-    if os.path.isfile(ft_uma_path):
-        with open(ft_uma_path) as f:
-            uma_finetuned = json.load(f)
+    import glob as _glob
+    _uma_ft_files = sorted(
+        _glob.glob(os.path.join(args.output_dir, "uma_finetuned*summary.json"))
+    )
+    if _uma_ft_files:
+        uma_finetuned = {}
+        for _p in _uma_ft_files:
+            with open(_p) as f:
+                uma_finetuned.update(json.load(f))
 
     print_comparison_table(
         results, uma_summary, hydragnn_summary, mace_finetuned, uma_finetuned
