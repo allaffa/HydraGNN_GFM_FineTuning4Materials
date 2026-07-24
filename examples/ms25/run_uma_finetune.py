@@ -87,8 +87,17 @@ def load_system_atoms(system: str, split: str):
 # ---------------------------------------------------------------------------
 
 def train_uma(model, calc, train_atoms, has_forces, n_epochs, lr, batch_size,
-              force_weight, freeze_backbone, verbose=True) -> float:
-    if freeze_backbone:
+              force_weight, freeze_backbone, lora=False, lora_r=8, lora_alpha=16.0,
+              verbose=True) -> float:
+    if lora:
+        from utils.uma_finetune import apply_lora_to_backbone
+        n_lora = apply_lora_to_backbone(model.backbone, r=lora_r, alpha=lora_alpha)
+        if verbose:
+            print(f"    [LoRA] {n_lora} adapters injected (r={lora_r}, α={lora_alpha})")
+        for name, param in model.backbone.named_parameters():
+            if "lora_A" not in name and "lora_B" not in name:
+                param.requires_grad_(False)
+    elif freeze_backbone:
         for p in model.backbone.parameters():
             p.requires_grad_(False)
     params = [p for p in model.parameters() if p.requires_grad]
@@ -205,6 +214,10 @@ def parse_args():
     p.add_argument("--freeze-backbone", action="store_true")
     p.add_argument("--tag", default=None,
                    help="Variant tag; writes uma_finetuned_{tag}_summary.json and suffixes result keys.")
+    p.add_argument("--lora", action="store_true",
+                   help="LoRA fine-tuning of backbone scalar linear layers (preserves equivariance).")
+    p.add_argument("--lora-r", type=int, default=8, help="LoRA rank (default: 8).")
+    p.add_argument("--lora-alpha", type=float, default=16.0, help="LoRA alpha scaling (default: 16.0).")
     p.add_argument("--seed", type=int, default=42)
     return p.parse_args()
 
@@ -241,6 +254,7 @@ def main():
                 model, calc, train_atoms, has_forces,
                 n_epochs=args.epochs, lr=args.lr, batch_size=args.batch_size,
                 force_weight=args.force_weight, freeze_backbone=args.freeze_backbone,
+                lora=args.lora, lora_r=args.lora_r, lora_alpha=args.lora_alpha,
             )
         except Exception as exc:
             print(f"  ERROR during training: {exc}")
@@ -260,6 +274,7 @@ def main():
             "lr": args.lr,
             "force_weight": args.force_weight,
             "freeze_backbone": args.freeze_backbone,
+            "lora": args.lora,
             "training_wall_sec": round(training_sec, 2),
             "testset": test_metrics,
         }

@@ -14,7 +14,7 @@
 #SBATCH -J wig150_gfm
 #SBATCH -o logs/frontier/wiggle150-%j.out
 #SBATCH -e logs/frontier/wiggle150-%j.out
-#SBATCH -t 01:00:00
+#SBATCH -t 02:00:00
 #SBATCH -p batch
 #SBATCH -N 1
 
@@ -47,18 +47,23 @@ echo "### [1/5] HydraGNN benchmark"
 $SRUN python -u run_benchmark.py
 
 echo "### [2/5] MACE fine-tune"
-$SRUN "${MACE_PY}" -u run_mace_finetune.py --device cuda
+$SRUN "${MACE_PY}" -u run_mace_finetune.py --device cuda --lr 1e-4
 
-echo "### [3/5] UMA fine-tune  (full-FT + frozen, concurrent on 2 GCDs)"
-rm -f "${RESULTS}/uma_finetuned"*"summary.json"
+echo "### [3/5] UMA fine-tune  (full-FT + frozen + LoRA, concurrent on 3 GCDs)"
+rm -f "${RESULTS}/uma_finetuned_full_summary.json" \
+      "${RESULTS}/uma_finetuned_frozen_summary.json" \
+      "${RESULTS}/uma_finetuned_lora_summary.json"
 UMA_SRUN="srun -N1 -n1 -c${OMP_NUM_THREADS} --gpus-per-task=1 --gpu-bind=closest --overlap"
 $UMA_SRUN python -u run_uma_finetune.py --device cuda --tag full &
 uma_full_pid=$!
 $UMA_SRUN python -u run_uma_finetune.py --device cuda --tag frozen --freeze-backbone &
 uma_frozen_pid=$!
+$UMA_SRUN python -u run_uma_finetune.py --device cuda --tag lora --lora &
+uma_lora_pid=$!
 uma_rc=0
 wait "${uma_full_pid}"   || uma_rc=$?
 wait "${uma_frozen_pid}" || uma_rc=$?
+wait "${uma_lora_pid}"   || uma_rc=$?
 if [ "${uma_rc}" -ne 0 ]; then
     echo "UMA fine-tune step failed (rc=${uma_rc})" >&2
     exit "${uma_rc}"

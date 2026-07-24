@@ -47,18 +47,21 @@ cd "${REPO_ROOT}/examples/ms25"
 $SRUN python -u ensemble_fine_tune.py
 
 echo "### [2/4] MACE fine-tune (all systems)"
-$SRUN "${MACE_PY}" -u run_mace_finetune.py --device cuda
+$SRUN "${MACE_PY}" -u run_mace_finetune.py --device cuda --lr 1e-4
 
-echo "### [3/4] UMA fine-tune (all systems; full-FT + frozen, concurrent on 2 GCDs)"
-rm -f benchmark_results/uma_finetuned*summary.json
+echo "### [3/4] UMA fine-tune (all systems; frozen + LoRA, concurrent on 2 GCDs)"
+# ms25 has 8 systems x ~870 train samples with forces; full-FT ~130 min/epoch
+# -> not feasible within 2h. Frozen + LoRA run concurrently.
+rm -f benchmark_results/uma_finetuned_frozen_summary.json \
+      benchmark_results/uma_finetuned_lora_summary.json
 UMA_SRUN="srun -N1 -n1 -c${OMP_NUM_THREADS} --gpus-per-task=1 --gpu-bind=closest --overlap"
-$UMA_SRUN python -u run_uma_finetune.py --device cuda --tag full &
-uma_full_pid=$!
 $UMA_SRUN python -u run_uma_finetune.py --device cuda --tag frozen --freeze-backbone &
 uma_frozen_pid=$!
+$UMA_SRUN python -u run_uma_finetune.py --device cuda --tag lora --lora &
+uma_lora_pid=$!
 uma_rc=0
-wait "${uma_full_pid}"   || uma_rc=$?
 wait "${uma_frozen_pid}" || uma_rc=$?
+wait "${uma_lora_pid}"   || uma_rc=$?
 if [ "${uma_rc}" -ne 0 ]; then
     echo "UMA fine-tune step failed (rc=${uma_rc})" >&2
     exit "${uma_rc}"
