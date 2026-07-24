@@ -3,40 +3,40 @@
     "best_energy_mae_eV_atom": 0.011001335456967354,
     "best_energy_mae_kcal_mol_atom": 0.25370069683957847,
     "best_energy_epoch": 9,
-    "training_wall_sec": 36.42,
-    "inference_wall_sec": 0.68,
+    "training_wall_sec": 38.28,
+    "inference_wall_sec": 0.7,
     "test_energy_mae_eV_atom": 0.01501315925270319
   },
   "unfrozen": {
-    "best_energy_mae_eV_atom": 0.01312549039721489,
-    "best_energy_mae_kcal_mol_atom": 0.3026856215011329,
-    "best_energy_epoch": 8,
-    "training_wall_sec": 20.53,
-    "inference_wall_sec": 0.33,
-    "test_energy_mae_eV_atom": 0.023723147809505463
+    "best_energy_mae_eV_atom": 0.014553171582520008,
+    "best_energy_mae_kcal_mol_atom": 0.33560923454733566,
+    "best_energy_epoch": 10,
+    "training_wall_sec": 22.26,
+    "inference_wall_sec": 0.37,
+    "test_energy_mae_eV_atom": 0.02151268906891346
   },
   "ani1x_recycled": {
-    "best_energy_mae_eV_atom": 0.01991836167871952,
-    "best_energy_mae_kcal_mol_atom": 0.459335346836783,
-    "best_energy_epoch": 10,
-    "training_wall_sec": 20.75,
-    "inference_wall_sec": 0.33,
-    "test_energy_mae_eV_atom": 0.02486724965274334
+    "best_energy_mae_eV_atom": 0.022904733195900917,
+    "best_energy_mae_kcal_mol_atom": 0.5282037617573515,
+    "best_energy_epoch": 7,
+    "training_wall_sec": 22.37,
+    "inference_wall_sec": 0.36,
+    "test_energy_mae_eV_atom": 0.18291865289211273
   },
   "qm7x_recycled": {
-    "best_energy_mae_eV_atom": 0.011250209994614124,
-    "best_energy_mae_kcal_mol_atom": 0.2594399676647969,
-    "best_energy_epoch": 6,
-    "training_wall_sec": 20.46,
-    "inference_wall_sec": 0.33,
-    "test_energy_mae_eV_atom": 0.027788762003183365
+    "best_energy_mae_eV_atom": 0.008869740180671215,
+    "best_energy_mae_kcal_mol_atom": 0.2045441913324408,
+    "best_energy_epoch": 9,
+    "training_wall_sec": 22.33,
+    "inference_wall_sec": 0.37,
+    "test_energy_mae_eV_atom": 0.026072824373841286
   },
   "frozen": {
     "best_energy_mae_eV_atom": 0.008089466020464897,
     "best_energy_mae_kcal_mol_atom": 0.18655036695133895,
     "best_energy_epoch": 9,
-    "training_wall_sec": 20.12,
-    "inference_wall_sec": 0.34,
+    "training_wall_sec": 22.2,
+    "inference_wall_sec": 0.37,
     "test_energy_mae_eV_atom": 0.01267255935817957
   }
 }

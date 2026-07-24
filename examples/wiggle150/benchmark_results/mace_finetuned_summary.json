@@ -1,0 +1,36 @@
+{
+  "mace_off_medium": {
+    "model_name": "MACE-OFF23 (medium)",
+    "n_epochs": 50,
+    "n_train": 107,
+    "training_wall_sec": 156.52,
+    "testset": {
+      "n_structures": 23,
+      "n_composition_groups": 3,
+      "inference_wall_sec": 43.11,
+      "energy_mae_eV": 1.6655261386401037,
+      "energy_rmse_eV": 2.1299141886383186,
+      "energy_mae_kcal_mol": 38.40853173056557,
+      "note": "MACE total energies made relative within each composition group (min-shifted) to match the Wiggle150 convention."
+    }
+  },
+  "mace_polar_m": {
+    "model_name": "MACE-POLAR-1 (polar-1-m)",
+    "error": "Command '['/lustre/orion/lrn070/world-shared/mlupopa/HydraGNN_GFM_FineTuning4Materials/HydraGNN-Installation-Frontier-ROCm72/mace_venv_rocm72/bin/mace_run_train', '--name', 'mace_polar_m_wiggle150', '--foundation_model', '/lustre/orion/lrn070/world-shared/mlupopa/HydraGNN_GFM_FineTuning4Materials/mace_cache/mace/MACEPOLAR1Mmodel', '--train_file', '/tmp/mace_wiggle_data_jtz3cekl/train.xyz', '--valid_file', '/tmp/mace_wiggle_data_jtz3cekl/val.xyz', '--energy_key', 'REF_energy', '--forces_key', 'REF_forces', '--loss', 'weighted', '--energy_weight', '1.0', '--forces_weight', '0.0', '--E0s', 'average', '--lr', '0.001', '--max_num_epochs', '50', '--batch_size', '4', '--valid_batch_size', '4', '--device', 'cuda', '--default_dtype', 'float64', '--work_dir', '/tmp/mace_ft_mace_polar_m_e_90fhav', '--model_dir', '/tmp/mace_ft_mace_polar_m_e_90fhav/models', '--checkpoints_dir', '/tmp/mace_ft_mace_polar_m_e_90fhav/checkpoints', '--results_dir', '/tmp/mace_ft_mace_polar_m_e_90fhav/results', '--compute_stress', 'False', '--log_level', 'WARNING']' returned non-zero exit status 1."
+  },
+  "mace_mh1_omol": {
+    "model_name": "MACE-MH-1 (omol head)",
+    "n_epochs": 50,
+    "n_train": 107,
+    "training_wall_sec": 273.18,
+    "testset": {
+      "n_structures": 23,
+      "n_composition_groups": 3,
+      "inference_wall_sec": 3.2,
+      "energy_mae_eV": 2.918490901645498,
+      "energy_rmse_eV": 3.2767670764323147,
+      "energy_mae_kcal_mol": 67.30302683375666,
+      "note": "MACE total energies made relative within each composition group (min-shifted) to match the Wiggle150 convention."
+    }
+  }
+}
