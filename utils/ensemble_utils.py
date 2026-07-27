@@ -966,6 +966,7 @@ def get_ensemble(
     model_dir_list = [
         os.path.join(ensemble_path, model_id)
         for model_id in os.listdir(ensemble_path)
+        if os.path.isfile(os.path.join(ensemble_path, model_id, "config.json"))
     ]
 
     # Determine checkpoint_dir / checkpoint_path for config saving
@@ -1081,7 +1082,8 @@ def run_finetune(dictionary_variables, args, freeze_conv: bool = None):
 
         # Get model list
         ensemble_path = Path(args.pretrained_model_ensemble_path)
-        model_dir_list = [os.path.join(ensemble_path, model_id) for model_id in os.listdir(ensemble_path)]
+        model_dir_list = [os.path.join(ensemble_path, model_id) for model_id in os.listdir(ensemble_path)
+                          if os.path.isfile(os.path.join(ensemble_path, model_id, "config.json"))]
 
         # Load datasets
         trainset, valset, testset = load_datasets(args, ft_config, dictionary_variables)

@@ -76,11 +76,19 @@ pipeline_qm9() {
     set -euo pipefail
     cd "${REPO_ROOT}/examples/qm9"
 
-    echo "### QM9 [1/5] HydraGNN benchmark"
-    srun_on "$NODE" python -u run_benchmark.py
+    if [ ! -f "${RES}/benchmark_summary.json" ]; then
+        echo "### QM9 [1/5] HydraGNN benchmark"
+        srun_on "$NODE" python -u run_benchmark.py
+    else
+        echo "### QM9 [1/5] HydraGNN benchmark — SKIPPED (results exist)"
+    fi
 
-    echo "### QM9 [2/5] MACE fine-tune"
-    srun_on "$NODE" "${MACE_PY}" -u run_mace_finetune.py --device cuda --lr 1e-4
+    if [ ! -f "${RES}/mace_finetuned_summary.json" ]; then
+        echo "### QM9 [2/5] MACE fine-tune"
+        srun_on "$NODE" "${MACE_PY}" -u run_mace_finetune.py --device cuda --lr 1e-4
+    else
+        echo "### QM9 [2/5] MACE fine-tune — SKIPPED (results exist)"
+    fi
 
     echo "### QM9 [3/5] UMA fine-tune (frozen + LoRA concurrent)"
     rm -f "${RES}/uma_finetuned_frozen_summary.json" \
@@ -114,11 +122,19 @@ pipeline_md17() {
     set -euo pipefail
     cd "${REPO_ROOT}/examples/md17"
 
-    echo "### MD17 [1/5] HydraGNN benchmark"
-    srun_on "$NODE" python -u run_benchmark.py
+    if [ ! -f "${RES}/benchmark_summary.json" ]; then
+        echo "### MD17 [1/5] HydraGNN benchmark"
+        srun_on "$NODE" python -u run_benchmark.py
+    else
+        echo "### MD17 [1/5] HydraGNN benchmark — SKIPPED (results exist)"
+    fi
 
-    echo "### MD17 [2/5] MACE fine-tune"
-    srun_on "$NODE" "${MACE_PY}" -u run_mace_finetune.py --device cuda --lr 1e-4
+    if [ ! -f "${RES}/mace_finetuned_summary.json" ]; then
+        echo "### MD17 [2/5] MACE fine-tune"
+        srun_on "$NODE" "${MACE_PY}" -u run_mace_finetune.py --device cuda --lr 1e-4
+    else
+        echo "### MD17 [2/5] MACE fine-tune — SKIPPED (results exist)"
+    fi
 
     echo "### MD17 [3/5] UMA fine-tune (full 4ep + frozen + LoRA concurrent)"
     rm -f "${RES}/uma_finetuned_full_summary.json" \
@@ -190,11 +206,19 @@ pipeline_wiggle150() {
     set -euo pipefail
     cd "${REPO_ROOT}/examples/wiggle150"
 
-    echo "### Wiggle150 [1/5] HydraGNN benchmark"
-    srun_on "$NODE" python -u run_benchmark.py
+    if [ ! -f "${RES}/benchmark_summary.json" ]; then
+        echo "### Wiggle150 [1/5] HydraGNN benchmark"
+        srun_on "$NODE" python -u run_benchmark.py
+    else
+        echo "### Wiggle150 [1/5] HydraGNN benchmark — SKIPPED (results exist)"
+    fi
 
-    echo "### Wiggle150 [2/5] MACE fine-tune"
-    srun_on "$NODE" "${MACE_PY}" -u run_mace_finetune.py --device cuda --lr 1e-4
+    if [ ! -f "${RES}/mace_finetuned_summary.json" ]; then
+        echo "### Wiggle150 [2/5] MACE fine-tune"
+        srun_on "$NODE" "${MACE_PY}" -u run_mace_finetune.py --device cuda --lr 1e-4
+    else
+        echo "### Wiggle150 [2/5] MACE fine-tune — SKIPPED (results exist)"
+    fi
 
     echo "### Wiggle150 [3/5] UMA fine-tune (full + frozen + LoRA concurrent)"
     rm -f "${RES}/uma_finetuned_full_summary.json" \
