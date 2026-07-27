@@ -90,6 +90,13 @@ pipeline_qm9() {
         echo "### QM9 [2/5] MACE fine-tune — SKIPPED (results exist)"
     fi
 
+    if [ ! -f "${RES}/mace_finetuned_lora_summary.json" ]; then
+        echo "### QM9 [2b/5] MACE LoRA fine-tune"
+        srun_on "$NODE" "${MACE_PY}" -u run_mace_finetune.py --device cuda --tag lora --lora
+    else
+        echo "### QM9 [2b/5] MACE LoRA fine-tune — SKIPPED (results exist)"
+    fi
+
     echo "### QM9 [3/5] UMA fine-tune (frozen + LoRA concurrent)"
     rm -f "${RES}/uma_finetuned_frozen_summary.json" \
           "${RES}/uma_finetuned_lora_summary.json"
@@ -136,6 +143,13 @@ pipeline_md17() {
         echo "### MD17 [2/5] MACE fine-tune — SKIPPED (results exist)"
     fi
 
+    if [ ! -f "${RES}/mace_finetuned_lora_summary.json" ]; then
+        echo "### MD17 [2b/5] MACE LoRA fine-tune"
+        srun_on "$NODE" "${MACE_PY}" -u run_mace_finetune.py --device cuda --tag lora --lora
+    else
+        echo "### MD17 [2b/5] MACE LoRA fine-tune — SKIPPED (results exist)"
+    fi
+
     echo "### MD17 [3/5] UMA fine-tune (full 4ep + frozen + LoRA concurrent)"
     rm -f "${RES}/uma_finetuned_full_summary.json" \
           "${RES}/uma_finetuned_frozen_summary.json" \
@@ -179,6 +193,13 @@ pipeline_abc3() {
     cd "${REPO_ROOT}/examples/abc3"
     srun_on "$NODE" "${MACE_PY}" -u run_mace_finetune.py --device cuda
 
+    if [ ! -f "${RES}/mace_finetuned_lora_summary.json" ]; then
+        echo "### ABC3 [2b] MACE LoRA fine-tune"
+        srun_on "$NODE" "${MACE_PY}" -u run_mace_finetune.py --device cuda --tag lora --lora
+    else
+        echo "### ABC3 [2b] MACE LoRA fine-tune — SKIPPED (results exist)"
+    fi
+
     echo "### ABC3 [3/3] UMA fine-tune (full 2ep + frozen + LoRA concurrent)"
     rm -f "${RES}/uma_finetuned_full_summary.json" \
           "${RES}/uma_finetuned_frozen_summary.json" \
@@ -218,6 +239,13 @@ pipeline_wiggle150() {
         srun_on "$NODE" "${MACE_PY}" -u run_mace_finetune.py --device cuda --lr 1e-4
     else
         echo "### Wiggle150 [2/5] MACE fine-tune — SKIPPED (results exist)"
+    fi
+
+    if [ ! -f "${RES}/mace_finetuned_lora_summary.json" ]; then
+        echo "### Wiggle150 [2b/5] MACE LoRA fine-tune"
+        srun_on "$NODE" "${MACE_PY}" -u run_mace_finetune.py --device cuda --tag lora --lora
+    else
+        echo "### Wiggle150 [2b/5] MACE LoRA fine-tune — SKIPPED (results exist)"
     fi
 
     echo "### Wiggle150 [3/5] UMA fine-tune (full + frozen + LoRA concurrent)"
@@ -261,6 +289,13 @@ pipeline_ms25() {
 
     echo "### MS25 [2/4] MACE fine-tune"
     srun_on "$NODE" "${MACE_PY}" -u run_mace_finetune.py --device cuda --lr 1e-4
+
+    if [ ! -f "${RES}/mace_finetuned_lora_summary.json" ]; then
+        echo "### MS25 [2b] MACE LoRA fine-tune"
+        srun_on "$NODE" "${MACE_PY}" -u run_mace_finetune.py --device cuda --tag lora --lora
+    else
+        echo "### MS25 [2b] MACE LoRA fine-tune — SKIPPED (results exist)"
+    fi
 
     echo "### MS25 [3/4] UMA fine-tune (frozen + LoRA concurrent)"
     rm -f "${RES}/uma_finetuned_frozen_summary.json" \

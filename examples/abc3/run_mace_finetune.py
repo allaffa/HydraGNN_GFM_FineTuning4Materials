@@ -88,7 +88,8 @@ def write_xyz(atoms_list, path: Path):
 
 
 def finetune_mace(model_id, train_xyz, val_xyz, n_epochs, device,
-                  work_dir: Path, lr: float) -> tuple[Path, float]:
+                  work_dir: Path, lr: float,
+                  lora: bool = False, lora_rank: int = 4, lora_alpha: float = 1.0) -> tuple[Path, float]:
     model_dir = work_dir / "models"
     model_dir.mkdir(parents=True, exist_ok=True)
     cmd = [
@@ -113,6 +114,17 @@ def finetune_mace(model_id, train_xyz, val_xyz, n_epochs, device,
         "--compute_stress",   "False",
         "--log_level",        "WARNING",
     ]
+    if lora:
+        cmd += [
+            "--lora", "True",
+            "--lora_rank", str(lora_rank),
+            "--lora_alpha", str(lora_alpha),
+            "--ema",
+            "--ema_decay", "0.995",
+            "--amsgrad",
+            "--clip_grad", "10.0",
+            "--weight_decay", "0.0",
+        ]
     t0 = time.perf_counter()
     subprocess.run(cmd, check=True)
     training_sec = time.perf_counter() - t0
@@ -154,8 +166,15 @@ def parse_args():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--models", nargs="+", default=_DEFAULT_MODELS,
                    choices=list(MACE_MODELS.keys()))
-    p.add_argument("--epochs", type=int, default=50)
-    p.add_argument("--lr", type=float, default=1e-3)
+    p.add_argument("--tag", default="",
+                   help="Variant tag (e.g. 'lora'). Output: mace_finetuned_<tag>_summary.json.")
+    p.add_argument("--lora", action="store_true", help="Enable native MACE LoRA fine-tuning.")
+    p.add_argument("--lora-r", type=int, default=4, dest="lora_rank", help="LoRA rank (default: 4).")
+    p.add_argument("--lora-alpha", type=float, default=1.0, dest="lora_alpha",
+                   help="LoRA alpha scaling (default: 1.0).")
+    p.add_argument("--epochs", type=int, default=None,
+                   help="Training epochs (default: 10 for LoRA, 50 for naive).")
+    p.add_argument("--lr", type=float, default=None)
     p.add_argument("--device", default="cpu")
     p.add_argument("--keep-work-dir", action="store_true")
     return p.parse_args()
@@ -165,7 +184,10 @@ def main():
     args = parse_args()
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     FINETUNE_MODEL_DIR.mkdir(parents=True, exist_ok=True)
-    out_path = RESULTS_DIR / "mace_finetuned_summary.json"
+    lr = args.lr if args.lr is not None else (0.005 if args.lora else 1e-3)
+    epochs = args.epochs if args.epochs is not None else (10 if args.lora else 50)
+    _tag = args.tag
+    out_path = RESULTS_DIR / (f"mace_finetuned_{_tag}_summary.json" if _tag else "mace_finetuned_summary.json")
 
     print("Preparing ABC3 XYZ files …")
     train_atoms = build_split_atoms("trainset")
@@ -183,17 +205,19 @@ def main():
         label = MACE_MODELS[model_id]["label"]
         print(f"\n{'=' * 60}\nFine-tuning {label} on ABC3\n{'=' * 60}")
         work_dir = Path(tempfile.mkdtemp(prefix=f"mace_ft_{model_id}_abc3_"))
-        saved_model = FINETUNE_MODEL_DIR / f"{model_id}.model"
+        saved_model = FINETUNE_MODEL_DIR / f"{model_id}{'_' + _tag if _tag else ''}.model"
+        _rkey = f"{model_id} [{_tag}]" if _tag else model_id
         try:
             model_path, training_sec = finetune_mace(
                 model_id, str(train_xyz), str(val_xyz),
-                n_epochs=args.epochs, device=args.device, work_dir=work_dir, lr=args.lr,
+                n_epochs=epochs, device=args.device, work_dir=work_dir, lr=lr,
+                lora=args.lora, lora_rank=args.lora_rank, lora_alpha=args.lora_alpha,
             )
             shutil.copy(str(model_path), str(saved_model))
             print(f"  Training done in {training_sec:.1f}s → {saved_model}")
         except Exception as exc:
             print(f"  ERROR during training: {exc}")
-            all_results[model_id] = {"model_name": label, "error": str(exc)}
+            all_results[_rkey] = {"model_name": label, "error": str(exc)}
             with open(out_path, "w") as fh:
                 json.dump(all_results, fh, indent=2)
             continue
@@ -202,9 +226,9 @@ def main():
                 shutil.rmtree(str(work_dir), ignore_errors=True)
 
         test_metrics = evaluate_split(saved_model, "testset", args.device)
-        all_results[model_id] = {
+        all_results[_rkey] = {
             "model_name": label,
-            "n_epochs": args.epochs,
+            "n_epochs": epochs,
             "n_train": len(train_atoms),
             "training_wall_sec": round(training_sec, 2),
             "testset": test_metrics,

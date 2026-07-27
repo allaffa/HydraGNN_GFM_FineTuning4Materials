@@ -75,6 +75,9 @@ def finetune_mace(
     device: str,
     work_dir: Path,
     lr: float = 1e-3,
+    lora: bool = False,
+    lora_rank: int = 4,
+    lora_alpha: float = 1.0,
 ) -> tuple[Path, float]:
     model_dir = work_dir / "models"
     model_dir.mkdir(parents=True, exist_ok=True)
@@ -105,6 +108,17 @@ def finetune_mace(
         "--compute_stress",    "False",
         "--log_level",         "WARNING",
     ]
+    if lora:
+        cmd += [
+            "--lora", "True",
+            "--lora_rank", str(lora_rank),
+            "--lora_alpha", str(lora_alpha),
+            "--ema",
+            "--ema_decay", "0.995",
+            "--amsgrad",
+            "--clip_grad", "10.0",
+            "--weight_decay", "0.0",
+        ]
 
     t0 = time.perf_counter()
     subprocess.run(cmd, check=True)
@@ -210,9 +224,16 @@ def parse_args():
         choices=list(CHECKPOINT_PATHS.keys()),
         help="MACE model IDs to fine-tune (default: all).",
     )
-    p.add_argument("--epochs", type=int, default=50)
-    p.add_argument("--lr", type=float, default=1e-3,
-                   help="Learning rate (default: 1e-3, tuned for fine-tuning).")
+    p.add_argument("--tag", default="",
+                   help="Variant tag (e.g. 'lora'). Output: mace_finetuned_<tag>_summary.json.")
+    p.add_argument("--lora", action="store_true", help="Enable native MACE LoRA fine-tuning.")
+    p.add_argument("--lora-r", type=int, default=4, dest="lora_rank", help="LoRA rank (default: 4).")
+    p.add_argument("--lora-alpha", type=float, default=1.0, dest="lora_alpha",
+                   help="LoRA alpha scaling (default: 1.0).")
+    p.add_argument("--epochs", type=int, default=None,
+                   help="Training epochs (default: 10 for LoRA, 50 for naive).")
+    p.add_argument("--lr", type=float, default=None,
+                   help="Learning rate (default: 0.005 for LoRA, 1e-3 for naive).")
     p.add_argument("--device", default="cpu")
     p.add_argument("--keep-work-dir", action="store_true")
     return p.parse_args()
@@ -243,6 +264,10 @@ def main():
     atoms_list_to_xyz(val_atoms,   str(val_xyz),   has_forces=True)
     print(f"  XYZ files written to {tmp_data_dir}")
 
+    lr = args.lr if args.lr is not None else (0.005 if args.lora else 1e-3)
+    epochs = args.epochs if args.epochs is not None else (10 if args.lora else 50)
+    _tag = args.tag
+    out_path = RESULTS_DIR / (f"mace_finetuned_{_tag}_summary.json" if _tag else "mace_finetuned_summary.json")
     all_results: dict = {}
 
     for model_id in args.models:
@@ -250,23 +275,27 @@ def main():
         print(f"\n{'='*60}\nFine-tuning {label} on Wiggle150 …\n{'='*60}")
 
         work_dir = Path(tempfile.mkdtemp(prefix=f"mace_ft_{model_id}_"))
-        saved_model = FINETUNE_MODEL_DIR / f"{model_id}.model"
+        saved_model = FINETUNE_MODEL_DIR / f"{model_id}{'_' + _tag if _tag else ''}.model"
+        _rkey = f"{model_id} [{_tag}]" if _tag else model_id
 
         try:
             model_path, training_sec = finetune_mace(
                 model_id=model_id,
                 train_xyz=str(train_xyz),
                 val_xyz=str(val_xyz),
-                n_epochs=args.epochs,
+                n_epochs=epochs,
                 device=args.device,
                 work_dir=work_dir,
-                lr=args.lr,
+                lr=lr,
+                lora=args.lora,
+                lora_rank=args.lora_rank,
+                lora_alpha=args.lora_alpha,
             )
             shutil.copy(str(model_path), str(saved_model))
             print(f"  Training done in {training_sec:.1f}s → {saved_model}")
         except Exception as exc:
             print(f"  ERROR during training: {exc}")
-            all_results[model_id] = {"model_name": label, "error": str(exc)}
+            all_results[_rkey] = {"model_name": label, "error": str(exc)}
             continue
         finally:
             if not args.keep_work_dir:
@@ -280,16 +309,15 @@ def main():
             device=args.device,
         )
 
-        all_results[model_id] = {
+        all_results[_rkey] = {
             "model_name":        label,
-            "n_epochs":          args.epochs,
+            "n_epochs":          epochs,
             "n_train":           len(train_atoms),
             "training_wall_sec": round(training_sec, 2),
             "testset":           test_metrics,
         }
         print(f"  Test E-MAE = {test_metrics['energy_mae_eV']:.4f} eV")
 
-    out_path = RESULTS_DIR / "mace_finetuned_summary.json"
     with open(out_path, "w") as fh:
         json.dump(all_results, fh, indent=2)
     print(f"\nResults saved to {out_path}")
