@@ -84,6 +84,17 @@ srun_on() {
          --overlap -w "$node" "$@"
 }
 
+# --- Helper: srun pinned to one node AND one specific GCD ---------------------
+# Used for the concurrent UMA fine-tune variants (full/frozen/lora) so they run
+# on SEPARATE GCDs instead of contending on GCD 0.  Requests all 8 GCDs visible
+# (each node has 8) and restricts the ROCm runtime to a single GCD via
+# ROCR_VISIBLE_DEVICES, so the process sees exactly one device (cuda:0).
+srun_gcd() {
+    local node=$1 gcd=$2; shift 2
+    srun -N1 -n1 -c"${OMP_NUM_THREADS}" --gpus-per-node=8 --overlap \
+         -w "$node" --export=ALL,ROCR_VISIBLE_DEVICES="$gcd" "$@"
+}
+
 # ===========================================================================
 # QM9 pipeline (energy-only; full-FT result already saved, run frozen + LoRA)
 # ===========================================================================
@@ -114,12 +125,12 @@ pipeline_qm9() {
         echo "### QM9 [2b/5] MACE LoRA fine-tune — SKIPPED (results exist)"
     fi
 
-    echo "### QM9 [3/5] UMA fine-tune (frozen + LoRA concurrent)"
+    echo "### QM9 [3/5] UMA fine-tune (frozen + LoRA concurrent, separate GCDs)"
     rm -f "${RES}/uma_finetuned_frozen_summary.json" \
           "${RES}/uma_finetuned_lora_summary.json"
-    srun_on "$NODE" python -u run_uma_finetune.py --device cuda --tag frozen --freeze-backbone &
+    srun_gcd "$NODE" 0 python -u run_uma_finetune.py --device cuda --tag frozen --freeze-backbone &
     local p1=$!
-    srun_on "$NODE" python -u run_uma_finetune.py --device cuda --tag lora --lora &
+    srun_gcd "$NODE" 1 python -u run_uma_finetune.py --device cuda --tag lora --lora &
     local p2=$!
     local rc=0
     wait "$p1" || rc=$?
@@ -167,15 +178,15 @@ pipeline_md17() {
         echo "### MD17 [2b/5] MACE LoRA fine-tune — SKIPPED (results exist)"
     fi
 
-    echo "### MD17 [3/5] UMA fine-tune (full 4ep + frozen + LoRA concurrent)"
+    echo "### MD17 [3/5] UMA fine-tune (full 4ep + frozen + LoRA concurrent, separate GCDs)"
     rm -f "${RES}/uma_finetuned_full_summary.json" \
           "${RES}/uma_finetuned_frozen_summary.json" \
           "${RES}/uma_finetuned_lora_summary.json"
-    srun_on "$NODE" python -u run_uma_finetune.py --device cuda --tag full --epochs 4 &
+    srun_gcd "$NODE" 0 python -u run_uma_finetune.py --device cuda --tag full --epochs 4 &
     local p1=$!
-    srun_on "$NODE" python -u run_uma_finetune.py --device cuda --tag frozen --freeze-backbone &
+    srun_gcd "$NODE" 1 python -u run_uma_finetune.py --device cuda --tag frozen --freeze-backbone &
     local p2=$!
-    srun_on "$NODE" python -u run_uma_finetune.py --device cuda --tag lora --lora &
+    srun_gcd "$NODE" 2 python -u run_uma_finetune.py --device cuda --tag lora --lora &
     local p3=$!
     local rc=0
     wait "$p1" || rc=$?
@@ -217,15 +228,15 @@ pipeline_abc3() {
         echo "### ABC3 [2b] MACE LoRA fine-tune — SKIPPED (results exist)"
     fi
 
-    echo "### ABC3 [3/3] UMA fine-tune (full 2ep + frozen + LoRA concurrent)"
+    echo "### ABC3 [3/3] UMA fine-tune (full 2ep + frozen + LoRA concurrent, separate GCDs)"
     rm -f "${RES}/uma_finetuned_full_summary.json" \
           "${RES}/uma_finetuned_frozen_summary.json" \
           "${RES}/uma_finetuned_lora_summary.json"
-    srun_on "$NODE" python -u run_uma_finetune.py --device cuda --tag full --epochs 2 &
+    srun_gcd "$NODE" 0 python -u run_uma_finetune.py --device cuda --tag full --epochs 2 &
     local p1=$!
-    srun_on "$NODE" python -u run_uma_finetune.py --device cuda --tag frozen --freeze-backbone &
+    srun_gcd "$NODE" 1 python -u run_uma_finetune.py --device cuda --tag frozen --freeze-backbone &
     local p2=$!
-    srun_on "$NODE" python -u run_uma_finetune.py --device cuda --tag lora --lora &
+    srun_gcd "$NODE" 2 python -u run_uma_finetune.py --device cuda --tag lora --lora &
     local p3=$!
     local rc=0
     wait "$p1" || rc=$?
@@ -265,15 +276,15 @@ pipeline_wiggle150() {
         echo "### Wiggle150 [2b/5] MACE LoRA fine-tune — SKIPPED (results exist)"
     fi
 
-    echo "### Wiggle150 [3/5] UMA fine-tune (full + frozen + LoRA concurrent)"
+    echo "### Wiggle150 [3/5] UMA fine-tune (full + frozen + LoRA concurrent, separate GCDs)"
     rm -f "${RES}/uma_finetuned_full_summary.json" \
           "${RES}/uma_finetuned_frozen_summary.json" \
           "${RES}/uma_finetuned_lora_summary.json"
-    srun_on "$NODE" python -u run_uma_finetune.py --device cuda --tag full &
+    srun_gcd "$NODE" 0 python -u run_uma_finetune.py --device cuda --tag full &
     local p1=$!
-    srun_on "$NODE" python -u run_uma_finetune.py --device cuda --tag frozen --freeze-backbone &
+    srun_gcd "$NODE" 1 python -u run_uma_finetune.py --device cuda --tag frozen --freeze-backbone &
     local p2=$!
-    srun_on "$NODE" python -u run_uma_finetune.py --device cuda --tag lora --lora &
+    srun_gcd "$NODE" 2 python -u run_uma_finetune.py --device cuda --tag lora --lora &
     local p3=$!
     local rc=0
     wait "$p1" || rc=$?
@@ -314,12 +325,12 @@ pipeline_ms25() {
         echo "### MS25 [2b] MACE LoRA fine-tune — SKIPPED (results exist)"
     fi
 
-    echo "### MS25 [3/4] UMA fine-tune (frozen + LoRA concurrent)"
+    echo "### MS25 [3/4] UMA fine-tune (frozen + LoRA concurrent, separate GCDs)"
     rm -f "${RES}/uma_finetuned_frozen_summary.json" \
           "${RES}/uma_finetuned_lora_summary.json"
-    srun_on "$NODE" python -u run_uma_finetune.py --device cuda --tag frozen --freeze-backbone &
+    srun_gcd "$NODE" 0 python -u run_uma_finetune.py --device cuda --tag frozen --freeze-backbone &
     local p1=$!
-    srun_on "$NODE" python -u run_uma_finetune.py --device cuda --tag lora --lora &
+    srun_gcd "$NODE" 1 python -u run_uma_finetune.py --device cuda --tag lora --lora &
     local p2=$!
     local rc=0
     wait "$p1" || rc=$?
@@ -337,6 +348,19 @@ pipeline_ms25() {
 # ===========================================================================
 LOG="${REPO_ROOT}/logs/frontier/all-${SLURM_JOB_ID}"
 echo "### Launching 5 dataset pipelines in parallel at $(date)"
+
+# --- Cheap GPU-binding probe: confirm 3 GCDs are independently addressable ----
+# on one node before committing to the concurrent UMA runs.  Each probe pins to
+# a distinct GCD; each should report device_count=1 and a GPU name.  Runs in a
+# few seconds; if binding is broken it shows up here instead of after 2h.
+echo "### GPU-binding probe on ${QM9_NODE}:"
+for g in 0 1 2; do
+    srun_gcd "$QM9_NODE" "$g" python -c \
+        "import torch;print(f'[probe GCD $g] device_count=',torch.cuda.device_count(),'name=',torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'NONE')" &
+done
+wait
+echo "### GPU-binding probe done."
+
 pipeline_qm9       "$QM9_NODE"  > "${LOG}-qm9.log"      2>&1 &
 pipeline_md17      "$MD17_NODE" > "${LOG}-md17.log"     2>&1 &
 pipeline_abc3      "$ABC3_NODE" > "${LOG}-abc3.log"     2>&1 &
