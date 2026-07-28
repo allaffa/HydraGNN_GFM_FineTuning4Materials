@@ -58,6 +58,23 @@ MS25_NODE="${NODES[4]}"
 echo "Node assignments:"
 echo "  QM9=${QM9_NODE}  MD17=${MD17_NODE}  ABC3=${ABC3_NODE}  WIG=${WIG_NODE}  MS25=${MS25_NODE}"
 
+# --- Ensure the HydraGNN ensemble checkpoint has the base-name that ------------
+# hydragnn.utils.model.load_existing_model expects.  The distributed pretraining
+# saved it as "<name>_epoch_97.pk"; load_existing_model looks for "<name>.pk".
+# abc3/ms25 (ensemble_fine_tune.py) use load_existing_model directly, so create a
+# symlink if the base-named file is missing (idempotent, no-op if it exists).
+GFM_DIR="${REPO_ROOT}/pretrained_model_ensemble/multidataset_hpo-BEST6-fp64"
+GFM_BASE="${GFM_DIR}/multidataset_hpo-BEST6-fp64.pk"
+if [ ! -e "${GFM_BASE}" ]; then
+    GFM_EPOCH=$(ls -1 "${GFM_DIR}"/multidataset_hpo-BEST6-fp64_epoch_*.pk 2>/dev/null | sort -t_ -k3 -n | tail -1)
+    if [ -n "${GFM_EPOCH}" ]; then
+        ln -s "$(basename "${GFM_EPOCH}")" "${GFM_BASE}"
+        echo "Linked checkpoint: $(basename "${GFM_BASE}") -> $(basename "${GFM_EPOCH}")"
+    else
+        echo "WARNING: no GFM checkpoint found in ${GFM_DIR}" >&2
+    fi
+fi
+
 # --- Helper: srun pinned to one node, overlapping with all other pipelines ----
 # All srun calls use --overlap so the 5 dataset pipelines (and the concurrent
 # UMA steps within each) can all run simultaneously.
