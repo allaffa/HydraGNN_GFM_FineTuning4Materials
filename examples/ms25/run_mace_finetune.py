@@ -134,7 +134,7 @@ def finetune_mace(model_id, train_xyz, val_xyz, has_forces, n_epochs, device,
         "--train_file",       str(train_xyz),
         "--valid_file",       str(val_xyz),
         "--energy_key",       "REF_energy",
-        "--loss",             "ef" if has_forces else "energy",
+        "--loss",             "ef" if has_forces else "weighted",
         "--E0s",              "average",
         "--lr",               str(lr),
         "--max_num_epochs",   str(n_epochs),
@@ -151,6 +151,8 @@ def finetune_mace(model_id, train_xyz, val_xyz, has_forces, n_epochs, device,
     ]
     if has_forces:
         cmd += ["--forces_key", "REF_forces"]
+    else:
+        cmd += ["--energy_weight", "1.0", "--forces_weight", "0.0"]
     if lora:
         cmd += [
             "--lora", "True",
