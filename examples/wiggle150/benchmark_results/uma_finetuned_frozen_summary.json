@@ -1,0 +1,20 @@
+{
+  "uma-s-1p2 [frozen]": {
+    "model_name": "UMA uma-s-1p2 (fine-tuned)",
+    "n_epochs": 30,
+    "n_train": 107,
+    "lr": 0.0001,
+    "freeze_backbone": true,
+    "lora": false,
+    "training_wall_sec": 3406.95,
+    "testset": {
+      "n_structures": 23,
+      "n_composition_groups": 3,
+      "inference_wall_sec": 5.7,
+      "energy_mae_eV": 2.5254760686534015,
+      "energy_rmse_eV": 2.8445736923703264,
+      "energy_mae_kcal_mol": 58.23975107160923,
+      "note": "UMA total energies made relative within each composition group (min-shifted) to match the Wiggle150 convention."
+    }
+  }
+}

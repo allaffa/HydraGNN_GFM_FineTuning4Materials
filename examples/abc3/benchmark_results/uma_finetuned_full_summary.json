@@ -1,0 +1,18 @@
+{
+  "uma-s-1p2 [full]": {
+    "model_name": "UMA uma-s-1p2 (FT)",
+    "n_epochs": 2,
+    "n_train": 3185,
+    "lr": 0.0001,
+    "freeze_backbone": false,
+    "lora": false,
+    "training_wall_sec": 6553.69,
+    "testset": {
+      "n_structures": 683,
+      "inference_wall_sec": 78.83,
+      "energy_mae_eV_per_atom": 5.875814788810728,
+      "energy_rmse_eV_per_atom": 6.092425807166467,
+      "note": "Formation energy per atom; direct MAE (no centering) after fine-tuning."
+    }
+  }
+}

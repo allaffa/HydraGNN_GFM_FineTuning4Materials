@@ -250,18 +250,9 @@ pipeline_abc3() {
     else
         echo "### ABC3 [3/3] UMA full — SKIPPED (results exist)"
     fi
-    if [ ! -f "${RES}/uma_finetuned_frozen_summary.json" ]; then
-        srun_on "$NODE" python -u run_uma_finetune.py --device cuda --tag frozen --freeze-backbone \
-            || { echo "ABC3 UMA frozen failed" >&2; exit 1; }
-    else
-        echo "### ABC3 [3/3] UMA frozen — SKIPPED (results exist)"
-    fi
-    if [ ! -f "${RES}/uma_finetuned_lora_summary.json" ]; then
-        srun_on "$NODE" python -u run_uma_finetune.py --device cuda --tag lora --lora \
-            || { echo "ABC3 UMA lora failed" >&2; exit 1; }
-    else
-        echo "### ABC3 [3/3] UMA lora — SKIPPED (results exist)"
-    fi
+    # ABC3 has 3185 training samples; UMA takes ~55 min/epoch → frozen/lora
+    # at 10 epochs each ≈ 9h: not feasible in 2h debug QOS.  Skip.
+    echo "### ABC3 [3/3] UMA frozen/lora — SKIPPED (too slow: ~55 min/epoch × 10ep)"
     echo "### ABC3 pipeline complete."
 }
 
@@ -357,19 +348,9 @@ pipeline_ms25() {
         echo "### MS25 [2b] MACE LoRA fine-tune — SKIPPED (results exist)"
     fi
 
-    echo "### MS25 [3/4] UMA fine-tune (frozen then LoRA — sequential)"
-    if [ ! -f "${RES}/uma_finetuned_frozen_summary.json" ]; then
-        srun_on "$NODE" python -u run_uma_finetune.py --device cuda --tag frozen --freeze-backbone \
-            || { echo "MS25 UMA frozen failed" >&2; exit 1; }
-    else
-        echo "### MS25 [3/4] UMA frozen — SKIPPED (results exist)"
-    fi
-    if [ ! -f "${RES}/uma_finetuned_lora_summary.json" ]; then
-        srun_on "$NODE" python -u run_uma_finetune.py --device cuda --tag lora --lora \
-            || { echo "MS25 UMA lora failed" >&2; exit 1; }
-    else
-        echo "### MS25 [3/4] UMA lora — SKIPPED (results exist)"
-    fi
+    # MS25 is MLIP multi-system; UMA fine-tune is similarly slow as ABC3.
+    # Skip UMA frozen/lora; zero-shot benchmarks still run below.
+    echo "### MS25 [3/4] UMA frozen/lora — SKIPPED (large dataset, not feasible in 2h debug QOS)"
 
     echo "### MS25 [4/4] Zero-shot benchmarks"
     srun_on "$NODE" python -u run_uma_benchmark.py --device cuda

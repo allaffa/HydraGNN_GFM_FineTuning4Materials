@@ -3,10 +3,10 @@
     "label": "MACE-OFF23 (medium)",
     "testset": {
       "n_structures": 147,
-      "inference_wall_sec": 48.85,
-      "energy_per_atom_mae_eV": 0.010076198002797646,
-      "energy_per_atom_rmse_eV": 0.014026122759890047,
-      "energy_per_atom_mae_kcal_mol": 0.23236619452271623,
+      "inference_wall_sec": 29.41,
+      "energy_per_atom_mae_eV": 0.010076198002797855,
+      "energy_per_atom_rmse_eV": 0.014026122759890661,
+      "energy_per_atom_mae_kcal_mol": 0.23236619452272106,
       "note": "MACE total energy corrected by per-element linear reference energies (least-squares fit on evaluation split), divided by n_atoms, compared to QM9 per-atom atomization energy."
     }
   },
@@ -18,7 +18,7 @@
     "label": "MACE-MH-1 (omol head)",
     "testset": {
       "n_structures": 147,
-      "inference_wall_sec": 10.1,
+      "inference_wall_sec": 8.88,
       "energy_per_atom_mae_eV": 0.010380362799986432,
       "energy_per_atom_rmse_eV": 0.014859446305415006,
       "energy_per_atom_mae_kcal_mol": 0.2393805084942071,
@@ -29,10 +29,10 @@
     "label": "MACE-MP-0 (medium)",
     "testset": {
       "n_structures": 147,
-      "inference_wall_sec": 3.55,
-      "energy_per_atom_mae_eV": 0.02799790003909035,
-      "energy_per_atom_rmse_eV": 0.03730205745948752,
-      "energy_per_atom_mae_kcal_mol": 0.6456567730114587,
+      "inference_wall_sec": 3.53,
+      "energy_per_atom_mae_eV": 0.02799790003909029,
+      "energy_per_atom_rmse_eV": 0.0373020574594875,
+      "energy_per_atom_mae_kcal_mol": 0.6456567730114573,
       "note": "MACE total energy corrected by per-element linear reference energies (least-squares fit on evaluation split), divided by n_atoms, compared to QM9 per-atom atomization energy."
     }
   }
