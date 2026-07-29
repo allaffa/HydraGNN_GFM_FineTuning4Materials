@@ -125,17 +125,19 @@ pipeline_qm9() {
         echo "### QM9 [2b/5] MACE LoRA fine-tune — SKIPPED (results exist)"
     fi
 
-    echo "### QM9 [3/5] UMA fine-tune (frozen + LoRA concurrent, separate GCDs)"
-    rm -f "${RES}/uma_finetuned_frozen_summary.json" \
-          "${RES}/uma_finetuned_lora_summary.json"
-    srun_gcd "$NODE" 0 python -u run_uma_finetune.py --device cuda --tag frozen --freeze-backbone &
-    local p1=$!
-    srun_gcd "$NODE" 1 python -u run_uma_finetune.py --device cuda --tag lora --lora &
-    local p2=$!
-    local rc=0
-    wait "$p1" || rc=$?
-    wait "$p2" || rc=$?
-    [ "$rc" -eq 0 ] || { echo "QM9 UMA step failed (rc=$rc)" >&2; exit "$rc"; }
+    echo "### QM9 [3/5] UMA fine-tune (frozen then LoRA — sequential to avoid GCD contention)"
+    if [ ! -f "${RES}/uma_finetuned_frozen_summary.json" ]; then
+        srun_on "$NODE" python -u run_uma_finetune.py --device cuda --tag frozen --freeze-backbone \
+            || { echo "QM9 UMA frozen failed" >&2; exit 1; }
+    else
+        echo "### QM9 [3/5] UMA frozen — SKIPPED (results exist)"
+    fi
+    if [ ! -f "${RES}/uma_finetuned_lora_summary.json" ]; then
+        srun_on "$NODE" python -u run_uma_finetune.py --device cuda --tag lora --lora \
+            || { echo "QM9 UMA lora failed" >&2; exit 1; }
+    else
+        echo "### QM9 [3/5] UMA lora — SKIPPED (results exist)"
+    fi
 
     echo "### QM9 [4/5] UMA zero-shot"
     srun_on "$NODE" python -u run_uma_benchmark.py --device cuda \
@@ -178,21 +180,25 @@ pipeline_md17() {
         echo "### MD17 [2b/5] MACE LoRA fine-tune — SKIPPED (results exist)"
     fi
 
-    echo "### MD17 [3/5] UMA fine-tune (full 4ep + frozen + LoRA concurrent, separate GCDs)"
-    rm -f "${RES}/uma_finetuned_full_summary.json" \
-          "${RES}/uma_finetuned_frozen_summary.json" \
-          "${RES}/uma_finetuned_lora_summary.json"
-    srun_gcd "$NODE" 0 python -u run_uma_finetune.py --device cuda --tag full --epochs 4 &
-    local p1=$!
-    srun_gcd "$NODE" 1 python -u run_uma_finetune.py --device cuda --tag frozen --freeze-backbone &
-    local p2=$!
-    srun_gcd "$NODE" 2 python -u run_uma_finetune.py --device cuda --tag lora --lora &
-    local p3=$!
-    local rc=0
-    wait "$p1" || rc=$?
-    wait "$p2" || rc=$?
-    wait "$p3" || rc=$?
-    [ "$rc" -eq 0 ] || { echo "MD17 UMA step failed (rc=$rc)" >&2; exit "$rc"; }
+    echo "### MD17 [3/5] UMA fine-tune (full then frozen then LoRA — sequential)"
+    if [ ! -f "${RES}/uma_finetuned_full_summary.json" ]; then
+        srun_on "$NODE" python -u run_uma_finetune.py --device cuda --tag full --epochs 4 \
+            || { echo "MD17 UMA full failed" >&2; exit 1; }
+    else
+        echo "### MD17 [3/5] UMA full — SKIPPED (results exist)"
+    fi
+    if [ ! -f "${RES}/uma_finetuned_frozen_summary.json" ]; then
+        srun_on "$NODE" python -u run_uma_finetune.py --device cuda --tag frozen --freeze-backbone \
+            || { echo "MD17 UMA frozen failed" >&2; exit 1; }
+    else
+        echo "### MD17 [3/5] UMA frozen — SKIPPED (results exist)"
+    fi
+    if [ ! -f "${RES}/uma_finetuned_lora_summary.json" ]; then
+        srun_on "$NODE" python -u run_uma_finetune.py --device cuda --tag lora --lora \
+            || { echo "MD17 UMA lora failed" >&2; exit 1; }
+    else
+        echo "### MD17 [3/5] UMA lora — SKIPPED (results exist)"
+    fi
 
     echo "### MD17 [4/5] UMA zero-shot"
     srun_on "$NODE" python -u run_uma_benchmark.py --device cuda \
@@ -213,13 +219,22 @@ pipeline_abc3() {
     local RES="${REPO_ROOT}/examples/abc3/benchmark_results"
     set -euo pipefail
 
-    echo "### ABC3 [1/3] HydraGNN fine-tune"
     cd "${REPO_ROOT}"
-    srun_on "$NODE" python -u examples/abc3/ensemble_fine_tune.py
+    if [ ! -f "${RES}/.hydragnn_done" ]; then
+        echo "### ABC3 [1/3] HydraGNN fine-tune"
+        srun_on "$NODE" python -u examples/abc3/ensemble_fine_tune.py \
+            && touch "${RES}/.hydragnn_done"
+    else
+        echo "### ABC3 [1/3] HydraGNN fine-tune — SKIPPED (results exist)"
+    fi
 
-    echo "### ABC3 [2/3] MACE fine-tune"
     cd "${REPO_ROOT}/examples/abc3"
-    srun_on "$NODE" "${MACE_PY}" -u run_mace_finetune.py --device cuda
+    if [ ! -f "${RES}/mace_finetuned_summary.json" ]; then
+        echo "### ABC3 [2/3] MACE fine-tune"
+        srun_on "$NODE" "${MACE_PY}" -u run_mace_finetune.py --device cuda
+    else
+        echo "### ABC3 [2/3] MACE fine-tune — SKIPPED (results exist)"
+    fi
 
     if [ ! -f "${RES}/mace_finetuned_lora_summary.json" ]; then
         echo "### ABC3 [2b] MACE LoRA fine-tune"
@@ -228,21 +243,25 @@ pipeline_abc3() {
         echo "### ABC3 [2b] MACE LoRA fine-tune — SKIPPED (results exist)"
     fi
 
-    echo "### ABC3 [3/3] UMA fine-tune (full 2ep + frozen + LoRA concurrent, separate GCDs)"
-    rm -f "${RES}/uma_finetuned_full_summary.json" \
-          "${RES}/uma_finetuned_frozen_summary.json" \
-          "${RES}/uma_finetuned_lora_summary.json"
-    srun_gcd "$NODE" 0 python -u run_uma_finetune.py --device cuda --tag full --epochs 2 &
-    local p1=$!
-    srun_gcd "$NODE" 1 python -u run_uma_finetune.py --device cuda --tag frozen --freeze-backbone &
-    local p2=$!
-    srun_gcd "$NODE" 2 python -u run_uma_finetune.py --device cuda --tag lora --lora &
-    local p3=$!
-    local rc=0
-    wait "$p1" || rc=$?
-    wait "$p2" || rc=$?
-    wait "$p3" || rc=$?
-    [ "$rc" -eq 0 ] || { echo "ABC3 UMA step failed (rc=$rc)" >&2; exit "$rc"; }
+    echo "### ABC3 [3/3] UMA fine-tune (full then frozen then LoRA — sequential)"
+    if [ ! -f "${RES}/uma_finetuned_full_summary.json" ]; then
+        srun_on "$NODE" python -u run_uma_finetune.py --device cuda --tag full --epochs 2 \
+            || { echo "ABC3 UMA full failed" >&2; exit 1; }
+    else
+        echo "### ABC3 [3/3] UMA full — SKIPPED (results exist)"
+    fi
+    if [ ! -f "${RES}/uma_finetuned_frozen_summary.json" ]; then
+        srun_on "$NODE" python -u run_uma_finetune.py --device cuda --tag frozen --freeze-backbone \
+            || { echo "ABC3 UMA frozen failed" >&2; exit 1; }
+    else
+        echo "### ABC3 [3/3] UMA frozen — SKIPPED (results exist)"
+    fi
+    if [ ! -f "${RES}/uma_finetuned_lora_summary.json" ]; then
+        srun_on "$NODE" python -u run_uma_finetune.py --device cuda --tag lora --lora \
+            || { echo "ABC3 UMA lora failed" >&2; exit 1; }
+    else
+        echo "### ABC3 [3/3] UMA lora — SKIPPED (results exist)"
+    fi
     echo "### ABC3 pipeline complete."
 }
 
@@ -276,21 +295,25 @@ pipeline_wiggle150() {
         echo "### Wiggle150 [2b/5] MACE LoRA fine-tune — SKIPPED (results exist)"
     fi
 
-    echo "### Wiggle150 [3/5] UMA fine-tune (full + frozen + LoRA concurrent, separate GCDs)"
-    rm -f "${RES}/uma_finetuned_full_summary.json" \
-          "${RES}/uma_finetuned_frozen_summary.json" \
-          "${RES}/uma_finetuned_lora_summary.json"
-    srun_gcd "$NODE" 0 python -u run_uma_finetune.py --device cuda --tag full &
-    local p1=$!
-    srun_gcd "$NODE" 1 python -u run_uma_finetune.py --device cuda --tag frozen --freeze-backbone &
-    local p2=$!
-    srun_gcd "$NODE" 2 python -u run_uma_finetune.py --device cuda --tag lora --lora &
-    local p3=$!
-    local rc=0
-    wait "$p1" || rc=$?
-    wait "$p2" || rc=$?
-    wait "$p3" || rc=$?
-    [ "$rc" -eq 0 ] || { echo "Wiggle150 UMA step failed (rc=$rc)" >&2; exit "$rc"; }
+    echo "### Wiggle150 [3/5] UMA fine-tune (full then frozen then LoRA — sequential)"
+    if [ ! -f "${RES}/uma_finetuned_full_summary.json" ]; then
+        srun_on "$NODE" python -u run_uma_finetune.py --device cuda --tag full \
+            || { echo "Wiggle150 UMA full failed" >&2; exit 1; }
+    else
+        echo "### Wiggle150 [3/5] UMA full — SKIPPED (results exist)"
+    fi
+    if [ ! -f "${RES}/uma_finetuned_frozen_summary.json" ]; then
+        srun_on "$NODE" python -u run_uma_finetune.py --device cuda --tag frozen --freeze-backbone \
+            || { echo "Wiggle150 UMA frozen failed" >&2; exit 1; }
+    else
+        echo "### Wiggle150 [3/5] UMA frozen — SKIPPED (results exist)"
+    fi
+    if [ ! -f "${RES}/uma_finetuned_lora_summary.json" ]; then
+        srun_on "$NODE" python -u run_uma_finetune.py --device cuda --tag lora --lora \
+            || { echo "Wiggle150 UMA lora failed" >&2; exit 1; }
+    else
+        echo "### Wiggle150 [3/5] UMA lora — SKIPPED (results exist)"
+    fi
 
     echo "### Wiggle150 [4/5] UMA zero-shot"
     srun_on "$NODE" python -u run_uma_benchmark.py --device cuda \
@@ -312,11 +335,20 @@ pipeline_ms25() {
     set -euo pipefail
     cd "${REPO_ROOT}/examples/ms25"
 
-    echo "### MS25 [1/4] HydraGNN fine-tune (all systems)"
-    srun_on "$NODE" python -u ensemble_fine_tune.py
+    if [ ! -f "${RES}/.hydragnn_done" ]; then
+        echo "### MS25 [1/4] HydraGNN fine-tune (all systems)"
+        srun_on "$NODE" python -u ensemble_fine_tune.py \
+            && touch "${RES}/.hydragnn_done"
+    else
+        echo "### MS25 [1/4] HydraGNN fine-tune — SKIPPED (results exist)"
+    fi
 
-    echo "### MS25 [2/4] MACE fine-tune"
-    srun_on "$NODE" "${MACE_PY}" -u run_mace_finetune.py --device cuda --lr 1e-4
+    if [ ! -f "${RES}/mace_finetuned_summary.json" ]; then
+        echo "### MS25 [2/4] MACE fine-tune"
+        srun_on "$NODE" "${MACE_PY}" -u run_mace_finetune.py --device cuda --lr 1e-4
+    else
+        echo "### MS25 [2/4] MACE fine-tune — SKIPPED (results exist)"
+    fi
 
     if [ ! -f "${RES}/mace_finetuned_lora_summary.json" ]; then
         echo "### MS25 [2b] MACE LoRA fine-tune"
@@ -325,17 +357,19 @@ pipeline_ms25() {
         echo "### MS25 [2b] MACE LoRA fine-tune — SKIPPED (results exist)"
     fi
 
-    echo "### MS25 [3/4] UMA fine-tune (frozen + LoRA concurrent, separate GCDs)"
-    rm -f "${RES}/uma_finetuned_frozen_summary.json" \
-          "${RES}/uma_finetuned_lora_summary.json"
-    srun_gcd "$NODE" 0 python -u run_uma_finetune.py --device cuda --tag frozen --freeze-backbone &
-    local p1=$!
-    srun_gcd "$NODE" 1 python -u run_uma_finetune.py --device cuda --tag lora --lora &
-    local p2=$!
-    local rc=0
-    wait "$p1" || rc=$?
-    wait "$p2" || rc=$?
-    [ "$rc" -eq 0 ] || { echo "MS25 UMA step failed (rc=$rc)" >&2; exit "$rc"; }
+    echo "### MS25 [3/4] UMA fine-tune (frozen then LoRA — sequential)"
+    if [ ! -f "${RES}/uma_finetuned_frozen_summary.json" ]; then
+        srun_on "$NODE" python -u run_uma_finetune.py --device cuda --tag frozen --freeze-backbone \
+            || { echo "MS25 UMA frozen failed" >&2; exit 1; }
+    else
+        echo "### MS25 [3/4] UMA frozen — SKIPPED (results exist)"
+    fi
+    if [ ! -f "${RES}/uma_finetuned_lora_summary.json" ]; then
+        srun_on "$NODE" python -u run_uma_finetune.py --device cuda --tag lora --lora \
+            || { echo "MS25 UMA lora failed" >&2; exit 1; }
+    else
+        echo "### MS25 [3/4] UMA lora — SKIPPED (results exist)"
+    fi
 
     echo "### MS25 [4/4] Zero-shot benchmarks"
     srun_on "$NODE" python -u run_uma_benchmark.py --device cuda
@@ -348,18 +382,6 @@ pipeline_ms25() {
 # ===========================================================================
 LOG="${REPO_ROOT}/logs/frontier/all-${SLURM_JOB_ID}"
 echo "### Launching 5 dataset pipelines in parallel at $(date)"
-
-# --- Cheap GPU-binding probe: confirm 3 GCDs are independently addressable ----
-# on one node before committing to the concurrent UMA runs.  Each probe pins to
-# a distinct GCD; each should report device_count=1 and a GPU name.  Runs in a
-# few seconds; if binding is broken it shows up here instead of after 2h.
-echo "### GPU-binding probe on ${QM9_NODE}:"
-for g in 0 1 2; do
-    srun_gcd "$QM9_NODE" "$g" python -c \
-        "import torch,os;d=torch.cuda.device_count();n=torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'NONE';print(f'[probe GCD $g] HIP_VISIBLE_DEVICES={os.environ.get(\"HIP_VISIBLE_DEVICES\",\"unset\")} device_count={d} name={n}')" &
-done
-wait
-echo "### GPU-binding probe done."
 
 pipeline_qm9       "$QM9_NODE"  > "${LOG}-qm9.log"      2>&1 &
 pipeline_md17      "$MD17_NODE" > "${LOG}-md17.log"     2>&1 &
