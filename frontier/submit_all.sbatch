@@ -297,7 +297,7 @@ pipeline_wiggle150() {
 
     echo "### Wiggle150 [3/5] UMA fine-tune (full then frozen then LoRA — sequential)"
     if [ ! -f "${RES}/uma_finetuned_full_summary.json" ]; then
-        srun_on "$NODE" python -u run_uma_finetune.py --device cuda --tag full \
+        srun_on "$NODE" python -u run_uma_finetune.py --device cuda --tag full --epochs 10 \
             || { echo "Wiggle150 UMA full failed" >&2; exit 1; }
     else
         echo "### Wiggle150 [3/5] UMA full — SKIPPED (results exist)"
