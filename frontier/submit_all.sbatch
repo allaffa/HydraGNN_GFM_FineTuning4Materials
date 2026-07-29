@@ -86,13 +86,13 @@ srun_on() {
 
 # --- Helper: srun pinned to one node AND one specific GCD ---------------------
 # Used for the concurrent UMA fine-tune variants (full/frozen/lora) so they run
-# on SEPARATE GCDs instead of contending on GCD 0.  Requests all 8 GCDs visible
-# (each node has 8) and restricts the ROCm runtime to a single GCD via
-# ROCR_VISIBLE_DEVICES, so the process sees exactly one device (cuda:0).
+# on SEPARATE GCDs instead of contending on GCD 0.  On Frontier/MI250X the
+# correct env var is HIP_VISIBLE_DEVICES (ROCR_VISIBLE_DEVICES is ignored by
+# the ROCm 7.x runtime under SLURM).  Each process sees exactly one device (cuda:0).
 srun_gcd() {
     local node=$1 gcd=$2; shift 2
     srun -N1 -n1 -c"${OMP_NUM_THREADS}" --gpus-per-node=8 --overlap \
-         -w "$node" --export=ALL,ROCR_VISIBLE_DEVICES="$gcd" "$@"
+         -w "$node" --export=ALL,HIP_VISIBLE_DEVICES="$gcd",ROCR_VISIBLE_DEVICES="$gcd" "$@"
 }
 
 # ===========================================================================
@@ -356,7 +356,7 @@ echo "### Launching 5 dataset pipelines in parallel at $(date)"
 echo "### GPU-binding probe on ${QM9_NODE}:"
 for g in 0 1 2; do
     srun_gcd "$QM9_NODE" "$g" python -c \
-        "import torch;print(f'[probe GCD $g] device_count=',torch.cuda.device_count(),'name=',torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'NONE')" &
+        "import torch,os;d=torch.cuda.device_count();n=torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'NONE';print(f'[probe GCD $g] HIP_VISIBLE_DEVICES={os.environ.get(\"HIP_VISIBLE_DEVICES\",\"unset\")} device_count={d} name={n}')" &
 done
 wait
 echo "### GPU-binding probe done."
