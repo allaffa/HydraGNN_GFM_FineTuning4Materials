@@ -1,0 +1,34 @@
+{
+  "mace_off_medium [lora]": {
+    "model_name": "MACE-OFF23 (medium)",
+    "n_epochs": 10,
+    "n_train": 682,
+    "training_wall_sec": 117.43,
+    "testset": {
+      "n_structures": 147,
+      "inference_wall_sec": 39.95,
+      "energy_per_atom_mae_eV": 0.07984662443023394,
+      "energy_per_atom_rmse_eV": 0.11532706623049535,
+      "energy_per_atom_mae_kcal_mol": 1.8413350213231818,
+      "note": "MACE total energy corrected by per-element linear reference energies (least-squares fit on evaluation split), divided by n_atoms, compared to QM9 per-atom atomization energy."
+    }
+  },
+  "mace_polar_m [lora]": {
+    "model_name": "MACE-POLAR-1 (polar-1-m)",
+    "error": "Command '['/lustre/orion/lrn070/world-shared/mlupopa/HydraGNN_GFM_FineTuning4Materials/HydraGNN-Installation-Frontier-ROCm72/mace_venv_rocm72/bin/mace_run_train', '--name', 'mace_polar_m_qm9', '--foundation_model', '/lustre/orion/lrn070/world-shared/mlupopa/HydraGNN_GFM_FineTuning4Materials/mace_cache/mace/MACEPOLAR1Mmodel', '--train_file', '/tmp/mace_qm9_data_73em8qq9/train.xyz', '--valid_file', '/tmp/mace_qm9_data_73em8qq9/val.xyz', '--energy_key', 'REF_energy', '--forces_key', 'REF_forces', '--loss', 'weighted', '--energy_weight', '1.0', '--forces_weight', '0.0', '--E0s', 'average', '--lr', '0.005', '--max_num_epochs', '10', '--batch_size', '16', '--valid_batch_size', '16', '--device', 'cuda', '--default_dtype', 'float64', '--work_dir', '/tmp/mace_ft_mace_polar_m_llx98fdp', '--model_dir', '/tmp/mace_ft_mace_polar_m_llx98fdp/models', '--checkpoints_dir', '/tmp/mace_ft_mace_polar_m_llx98fdp/checkpoints', '--results_dir', '/tmp/mace_ft_mace_polar_m_llx98fdp/results', '--compute_stress', 'False', '--log_level', 'WARNING', '--lora', 'True', '--lora_rank', '4', '--lora_alpha', '1.0', '--ema', '--ema_decay', '0.995', '--amsgrad', '--clip_grad', '10.0', '--weight_decay', '0.0']' returned non-zero exit status 1."
+  },
+  "mace_mh1_omol [lora]": {
+    "model_name": "MACE-MH-1 (omol head)",
+    "n_epochs": 10,
+    "n_train": 682,
+    "training_wall_sec": 154.81,
+    "testset": {
+      "n_structures": 147,
+      "inference_wall_sec": 8.09,
+      "energy_per_atom_mae_eV": 0.04698012536683638,
+      "energy_per_atom_rmse_eV": 0.09807821415543258,
+      "energy_per_atom_mae_kcal_mol": 1.083403973072077,
+      "note": "MACE total energy corrected by per-element linear reference energies (least-squares fit on evaluation split), divided by n_atoms, compared to QM9 per-atom atomization energy."
+    }
+  }
+}

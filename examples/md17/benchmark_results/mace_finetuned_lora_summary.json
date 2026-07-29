@@ -1,0 +1,40 @@
+{
+  "mace_off_medium [lora]": {
+    "model_name": "MACE-OFF23 (medium)",
+    "n_epochs": 10,
+    "n_train": 700,
+    "training_wall_sec": 233.18,
+    "testset": {
+      "n_structures": 150,
+      "inference_wall_sec": 19.36,
+      "energy_mae_eV": 4.110399567917181,
+      "energy_rmse_eV": 5.438536413812712,
+      "energy_mae_kcal_mol": 94.78951339578131,
+      "force_mae_eV_A": 17.45049552091816,
+      "force_rmse_eV_A": 24.342663086482776,
+      "force_mae_kcal_mol_A": 402.4241321583416,
+      "note": "Energies mean-centred before MAE to cancel DFT-reference offset; forces evaluated without centring."
+    }
+  },
+  "mace_polar_m [lora]": {
+    "model_name": "MACE-POLAR-1 (polar-1-m)",
+    "error": "Command '['/lustre/orion/lrn070/world-shared/mlupopa/HydraGNN_GFM_FineTuning4Materials/HydraGNN-Installation-Frontier-ROCm72/mace_venv_rocm72/bin/mace_run_train', '--name', 'mace_polar_m_md17', '--foundation_model', '/lustre/orion/lrn070/world-shared/mlupopa/HydraGNN_GFM_FineTuning4Materials/mace_cache/mace/MACEPOLAR1Mmodel', '--train_file', '/tmp/mace_md17_data__nmdpnh8/train.xyz', '--valid_file', '/tmp/mace_md17_data__nmdpnh8/val.xyz', '--energy_key', 'REF_energy', '--forces_key', 'REF_forces', '--loss', 'ef', '--E0s', 'average', '--lr', '0.005', '--max_num_epochs', '10', '--batch_size', '4', '--valid_batch_size', '4', '--device', 'cuda', '--default_dtype', 'float64', '--work_dir', '/tmp/mace_ft_mace_polar_m_prj03559', '--model_dir', '/tmp/mace_ft_mace_polar_m_prj03559/models', '--checkpoints_dir', '/tmp/mace_ft_mace_polar_m_prj03559/checkpoints', '--results_dir', '/tmp/mace_ft_mace_polar_m_prj03559/results', '--compute_stress', 'False', '--log_level', 'WARNING', '--lora', 'True', '--lora_rank', '4', '--lora_alpha', '1.0', '--ema', '--ema_decay', '0.995', '--amsgrad', '--clip_grad', '10.0', '--weight_decay', '0.0']' returned non-zero exit status 1."
+  },
+  "mace_mh1_omol [lora]": {
+    "model_name": "MACE-MH-1 (omol head)",
+    "n_epochs": 10,
+    "n_train": 700,
+    "training_wall_sec": 280.81,
+    "testset": {
+      "n_structures": 150,
+      "inference_wall_sec": 10.77,
+      "energy_mae_eV": 4.122044729151481,
+      "energy_rmse_eV": 5.490893068658306,
+      "energy_mae_kcal_mol": 95.05806129448939,
+      "force_mae_eV_A": 17.49905726591204,
+      "force_rmse_eV_A": 24.416298947652756,
+      "force_mae_kcal_mol_A": 403.544009703471,
+      "note": "Energies mean-centred before MAE to cancel DFT-reference offset; forces evaluated without centring."
+    }
+  }
+}

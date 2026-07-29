@@ -3,31 +3,31 @@
     "model_name": "MACE-OFF23 (medium)",
     "n_epochs": 50,
     "n_train": 682,
-    "training_wall_sec": 228.01,
+    "training_wall_sec": 229.38,
     "testset": {
       "n_structures": 147,
-      "inference_wall_sec": 46.48,
-      "energy_per_atom_mae_eV": 0.040963662859904236,
-      "energy_per_atom_rmse_eV": 0.10983565606727351,
-      "energy_per_atom_mae_kcal_mol": 0.9446589328459656,
+      "inference_wall_sec": 46.57,
+      "energy_per_atom_mae_eV": 0.12773291849245239,
+      "energy_per_atom_rmse_eV": 0.21247124632935518,
+      "energy_per_atom_mae_kcal_mol": 2.9456360600625953,
       "note": "MACE total energy corrected by per-element linear reference energies (least-squares fit on evaluation split), divided by n_atoms, compared to QM9 per-atom atomization energy."
     }
   },
   "mace_polar_m": {
     "model_name": "MACE-POLAR-1 (polar-1-m)",
-    "error": "Command '['/lustre/orion/lrn070/world-shared/mlupopa/HydraGNN_GFM_FineTuning4Materials/HydraGNN-Installation-Frontier-ROCm72/mace_venv_rocm72/bin/mace_run_train', '--name', 'mace_polar_m_qm9', '--foundation_model', '/lustre/orion/lrn070/world-shared/mlupopa/HydraGNN_GFM_FineTuning4Materials/mace_cache/mace/MACEPOLAR1Mmodel', '--train_file', '/tmp/mace_qm9_data_ml00sjx8/train.xyz', '--valid_file', '/tmp/mace_qm9_data_ml00sjx8/val.xyz', '--energy_key', 'REF_energy', '--forces_key', 'REF_forces', '--loss', 'weighted', '--energy_weight', '1.0', '--forces_weight', '0.0', '--E0s', 'average', '--lr', '0.001', '--max_num_epochs', '50', '--batch_size', '16', '--valid_batch_size', '16', '--device', 'cuda', '--default_dtype', 'float64', '--work_dir', '/tmp/mace_ft_mace_polar_m_efxbt39p', '--model_dir', '/tmp/mace_ft_mace_polar_m_efxbt39p/models', '--checkpoints_dir', '/tmp/mace_ft_mace_polar_m_efxbt39p/checkpoints', '--results_dir', '/tmp/mace_ft_mace_polar_m_efxbt39p/results', '--compute_stress', 'False', '--log_level', 'WARNING']' returned non-zero exit status 1."
+    "error": "Command '['/lustre/orion/lrn070/world-shared/mlupopa/HydraGNN_GFM_FineTuning4Materials/HydraGNN-Installation-Frontier-ROCm72/mace_venv_rocm72/bin/mace_run_train', '--name', 'mace_polar_m_qm9', '--foundation_model', '/lustre/orion/lrn070/world-shared/mlupopa/HydraGNN_GFM_FineTuning4Materials/mace_cache/mace/MACEPOLAR1Mmodel', '--train_file', '/tmp/mace_qm9_data_5eiw6x6y/train.xyz', '--valid_file', '/tmp/mace_qm9_data_5eiw6x6y/val.xyz', '--energy_key', 'REF_energy', '--forces_key', 'REF_forces', '--loss', 'weighted', '--energy_weight', '1.0', '--forces_weight', '0.0', '--E0s', 'average', '--lr', '0.0001', '--max_num_epochs', '50', '--batch_size', '16', '--valid_batch_size', '16', '--device', 'cuda', '--default_dtype', 'float64', '--work_dir', '/tmp/mace_ft_mace_polar_m_lhptizk8', '--model_dir', '/tmp/mace_ft_mace_polar_m_lhptizk8/models', '--checkpoints_dir', '/tmp/mace_ft_mace_polar_m_lhptizk8/checkpoints', '--results_dir', '/tmp/mace_ft_mace_polar_m_lhptizk8/results', '--compute_stress', 'False', '--log_level', 'WARNING']' returned non-zero exit status 1."
   },
   "mace_mh1_omol": {
     "model_name": "MACE-MH-1 (omol head)",
     "n_epochs": 50,
     "n_train": 682,
-    "training_wall_sec": 467.99,
+    "training_wall_sec": 473.36,
     "testset": {
       "n_structures": 147,
-      "inference_wall_sec": 7.65,
-      "energy_per_atom_mae_eV": 0.009603833171342408,
-      "energy_per_atom_rmse_eV": 0.03416087625677981,
-      "energy_per_atom_mae_kcal_mol": 0.22147303638101015,
+      "inference_wall_sec": 7.44,
+      "energy_per_atom_mae_eV": 0.03381458517351546,
+      "energy_per_atom_rmse_eV": 0.1460294633869737,
+      "energy_per_atom_mae_kcal_mol": 0.7797947672279226,
       "note": "MACE total energy corrected by per-element linear reference energies (least-squares fit on evaluation split), divided by n_atoms, compared to QM9 per-atom atomization energy."
     }
   }
