@@ -1221,6 +1221,27 @@ def run_finetune(dictionary_variables, args, freeze_conv: bool = None):
                 ),
             )
 
+        else:
+            # Generic energy MAE for non-matbench datasets; saves to benchmark_results/
+            if rank == 0:
+                true_cpu = true_[0].to('cpu')
+                pred_cpu = pred_.to('cpu')
+                mae_eV = torch.mean(torch.abs(true_cpu - pred_cpu)).item()
+                summary = {"test_mae_eV": mae_eV}
+                if len(natoms) > 0:
+                    natoms_cat = torch.cat(natoms, dim=0).to('cpu').float()
+                    summary["test_mae_eV_per_atom"] = (
+                        torch.abs(true_cpu - pred_cpu) / natoms_cat
+                    ).mean().item()
+                try:
+                    results_dir = Path(os.path.abspath(args.finetuning_config)).parent / "benchmark_results"
+                    results_dir.mkdir(exist_ok=True)
+                    with open(results_dir / "benchmark_summary.json", "w") as _f:
+                        json.dump(summary, _f, indent=2)
+                    print(f"Saved test summary -> {results_dir / 'benchmark_summary.json'}")
+                except Exception as _e:
+                    print(f"Warning: could not save benchmark summary: {_e}")
+
         return True
     finally:
         torch.set_default_dtype(previous_default_dtype)

@@ -1,0 +1,15 @@
+{
+  "mace_mp0_medium [lora]": {
+    "model_name": "MACE-MP-0 (medium)",
+    "n_epochs": 10,
+    "n_train": 3185,
+    "training_wall_sec": 595.53,
+    "testset": {
+      "n_structures": 683,
+      "inference_wall_sec": 41.54,
+      "energy_mae_eV_per_atom": 0.0530099078166985,
+      "energy_rmse_eV_per_atom": 0.08096511965333697,
+      "note": "Formation energy per atom; direct MAE (no centering) after fine-tuning."
+    }
+  }
+}
