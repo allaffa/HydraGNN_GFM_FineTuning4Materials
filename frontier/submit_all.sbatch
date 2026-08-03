@@ -334,19 +334,8 @@ pipeline_ms25() {
         echo "### MS25 [1/4] HydraGNN fine-tune — SKIPPED (results exist)"
     fi
 
-    if [ ! -f "${RES}/mace_finetuned_summary.json" ]; then
-        echo "### MS25 [2/4] MACE fine-tune"
-        srun_on "$NODE" "${MACE_PY}" -u run_mace_finetune.py --device cuda --lr 1e-4
-    else
-        echo "### MS25 [2/4] MACE fine-tune — SKIPPED (results exist)"
-    fi
-
-    if [ ! -f "${RES}/mace_finetuned_lora_summary.json" ]; then
-        echo "### MS25 [2b] MACE LoRA fine-tune"
-        srun_on "$NODE" "${MACE_PY}" -u run_mace_finetune.py --device cuda --tag lora --lora
-    else
-        echo "### MS25 [2b] MACE LoRA fine-tune — SKIPPED (results exist)"
-    fi
+    # MS25 has 5 systems with 5000-8000 train samples each; MACE FT takes ~2h/system → infeasible.
+    echo "### MS25 [2/4] MACE fine-tune — SKIPPED (5 systems × ~2h each, not feasible in 2h debug QOS)"
 
     # MS25 is MLIP multi-system; UMA fine-tune is similarly slow as ABC3.
     # Skip UMA frozen/lora; zero-shot benchmarks still run below.
