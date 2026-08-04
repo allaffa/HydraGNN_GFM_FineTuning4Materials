@@ -1,0 +1,23 @@
+{
+  "uma-s-1p2 [lora]": {
+    "model_name": "UMA uma-s-1p2 (fine-tuned)",
+    "n_epochs": 20,
+    "n_train": 700,
+    "lr": 0.0001,
+    "force_weight": 10.0,
+    "freeze_backbone": false,
+    "lora": true,
+    "training_wall_sec": 5809.61,
+    "testset": {
+      "n_structures": 150,
+      "inference_wall_sec": 49.22,
+      "energy_mae_eV": 5.054365202056462,
+      "energy_rmse_eV": 6.67401717308203,
+      "energy_mae_kcal_mol": 116.55821048810387,
+      "force_mae_eV_A": 23.650205612182617,
+      "force_rmse_eV_A": 33.06908416748047,
+      "force_mae_kcal_mol_A": 545.3950266019821,
+      "note": "Energies mean-centred before MAE; forces evaluated without centring (reference-invariant)."
+    }
+  }
+}

@@ -4,31 +4,38 @@
     "testset": {
       "n_structures": 23,
       "n_composition_groups": 3,
-      "energy_mae_eV": 1.899007627965899,
-      "energy_rmse_eV": 2.5406934421722123,
-      "energy_mae_kcal_mol": 43.7928250077588,
+      "inference_wall_sec": 23.76,
+      "energy_mae_eV": 2.4123830918897116,
+      "energy_rmse_eV": 2.9204427863679694,
+      "energy_mae_kcal_mol": 55.63172524375945,
       "note": "MACE total energies are min-shifted within each composition group to match the Wiggle150 relative-energy convention."
     }
   },
   "mace_polar_m": {
     "label": "MACE-POLAR-1 (polar-1-m)",
-    "testset": {
-      "n_structures": 23,
-      "n_composition_groups": 3,
-      "energy_mae_eV": 1.9212017715992418,
-      "energy_rmse_eV": 2.57467739878471,
-      "energy_mae_kcal_mol": 44.30464193467296,
-      "note": "MACE total energies are min-shifted within each composition group to match the Wiggle150 relative-energy convention."
-    }
+    "error": "No module named 'graph_longrange'"
   },
   "mace_mh1_omol": {
     "label": "MACE-MH-1 (omol head)",
     "testset": {
       "n_structures": 23,
       "n_composition_groups": 3,
-      "energy_mae_eV": 1.9208227691309256,
-      "energy_rmse_eV": 2.568654470277974,
-      "energy_mae_kcal_mol": 44.295901796651364,
+      "inference_wall_sec": 4.5,
+      "energy_mae_eV": 2.440390230364637,
+      "energy_rmse_eV": 2.958191161094031,
+      "energy_mae_kcal_mol": 56.27759506341586,
+      "note": "MACE total energies are min-shifted within each composition group to match the Wiggle150 relative-energy convention."
+    }
+  },
+  "mace_mp0_medium": {
+    "label": "MACE-MP-0 (medium)",
+    "testset": {
+      "n_structures": 23,
+      "n_composition_groups": 3,
+      "inference_wall_sec": 0.61,
+      "energy_mae_eV": 2.877378939917534,
+      "energy_rmse_eV": 3.21906034721827,
+      "energy_mae_kcal_mol": 66.35494799554425,
       "note": "MACE total energies are min-shifted within each composition group to match the Wiggle150 relative-energy convention."
     }
   }

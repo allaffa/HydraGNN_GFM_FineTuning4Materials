@@ -1,13 +1,14 @@
 {
   "model_name": "uma-s-1p2",
   "task_name": "omol",
-  "dataset": "/Users/7ml/Documents/Codes/HydraGNN_GFM_FineTuning4Materials/dataset/wiggle150.pickle",
+  "dataset": "/lustre/orion/lrn070/world-shared/mlupopa/HydraGNN_GFM_FineTuning4Materials/dataset/wiggle150.pickle",
   "testset": {
     "n_structures": 23,
     "n_composition_groups": 3,
-    "energy_mae_eV": 1.925997435657653,
-    "energy_rmse_eV": 2.578374468760188,
-    "energy_mae_kcal_mol": 44.41523426395757,
+    "inference_wall_sec": 28.21,
+    "energy_mae_eV": 2.471763030087301,
+    "energy_rmse_eV": 2.993071018478177,
+    "energy_mae_kcal_mol": 57.00108006054023,
     "note": "UMA total energies are made relative within each composition group (min-shifted) to match the Wiggle150 convention of E_conf - E_min_conf.  Groups are identified by composition fingerprint."
   }
 }

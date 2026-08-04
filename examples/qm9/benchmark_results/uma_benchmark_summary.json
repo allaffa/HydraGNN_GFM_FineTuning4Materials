@@ -4,10 +4,10 @@
   "dataset": "/lustre/orion/lrn070/world-shared/mlupopa/HydraGNN_GFM_FineTuning4Materials/dataset/qm9_energy.pickle",
   "testset": {
     "n_structures": 147,
-    "inference_wall_sec": 13.91,
-    "energy_per_atom_mae_eV": 0.009938671473765958,
-    "energy_per_atom_rmse_eV": 0.014001428869114667,
-    "energy_per_atom_mae_kcal_mol": 0.2291947089893694,
+    "inference_wall_sec": 40.47,
+    "energy_per_atom_mae_eV": 0.009938671426529471,
+    "energy_per_atom_rmse_eV": 0.01400142895063093,
+    "energy_per_atom_mae_kcal_mol": 0.22919470790005347,
     "note": "UMA total energy corrected by per-element linear reference energies (least-squares fit on evaluation split), divided by n_atoms, compared to QM9 per-atom atomization energy."
   }
 }

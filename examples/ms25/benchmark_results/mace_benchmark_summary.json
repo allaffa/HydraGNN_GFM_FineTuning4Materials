@@ -1,0 +1,109 @@
+{
+  "mace_mp0_medium": {
+    "label": "MACE-MP-0 (medium)",
+    "MgO-2x2": {
+      "testset": {
+        "n_structures": 1638,
+        "mean_natoms": 64.0,
+        "inference_wall_sec": 75.68,
+        "energy_mae_eV": 0.07447533938523326,
+        "energy_rmse_eV": 0.09414597848024392,
+        "energy_mae_meV_per_atom": 1.1636771778942698,
+        "note": "Energies mean-centred per system to cancel the DFT-reference offset; forces evaluated without centering (conservative).",
+        "force_mae_eV_A": 0.06445966931782363,
+        "force_rmse_eV_A": 0.09725579626302847
+      }
+    },
+    "MgO-4x4": {
+      "testset": {
+        "n_structures": 1638,
+        "mean_natoms": 256.0,
+        "inference_wall_sec": 247.41,
+        "energy_mae_eV": 0.11512614140837071,
+        "energy_rmse_eV": 0.1409752718413741,
+        "energy_mae_meV_per_atom": 0.4497114898764481,
+        "note": "Energies mean-centred per system to cancel the DFT-reference offset; forces evaluated without centering (conservative).",
+        "force_mae_eV_A": 0.061335710132044745,
+        "force_rmse_eV_A": 0.08710806987686959
+      }
+    },
+    "H2O-64": {
+      "testset": {
+        "n_structures": 1638,
+        "mean_natoms": 192.0,
+        "inference_wall_sec": 254.8,
+        "energy_mae_eV": 0.46327430000685804,
+        "energy_rmse_eV": 0.6228257147062247,
+        "energy_mae_meV_per_atom": 2.4128869792023857,
+        "note": "Energies mean-centred per system to cancel the DFT-reference offset; forces evaluated without centering (conservative).",
+        "force_mae_eV_A": 0.14659410942333534,
+        "force_rmse_eV_A": 0.17258077223880752
+      }
+    },
+    "H2O-192": {
+      "testset": {
+        "n_structures": 1638,
+        "mean_natoms": 576.0,
+        "inference_wall_sec": 532.79,
+        "energy_mae_eV": 1.1515867565722258,
+        "energy_rmse_eV": 1.6859055050410863,
+        "energy_mae_meV_per_atom": 1.9992825634934475,
+        "note": "Energies mean-centred per system to cancel the DFT-reference offset; forces evaluated without centering (conservative).",
+        "force_mae_eV_A": 0.14667528514749043,
+        "force_rmse_eV_A": 0.17268738124542926
+      }
+    },
+    "CHA": {
+      "testset": {
+        "n_structures": 1638,
+        "mean_natoms": 288.0,
+        "inference_wall_sec": 185.68,
+        "energy_mae_eV": 0.3122724599975799,
+        "energy_rmse_eV": 0.3809069403506604,
+        "energy_mae_meV_per_atom": 1.0842793749915969,
+        "note": "Energies mean-centred per system to cancel the DFT-reference offset; forces evaluated without centering (conservative).",
+        "force_mae_eV_A": 0.10057411546655748,
+        "force_rmse_eV_A": 0.12462658030155552
+      }
+    },
+    "HEA": {
+      "testset": {
+        "n_structures": 1638,
+        "mean_natoms": 108.0,
+        "inference_wall_sec": 81.79,
+        "energy_mae_eV": 10.549643610081464,
+        "energy_rmse_eV": 13.080971787620305,
+        "energy_mae_meV_per_atom": 97.68188527853206,
+        "note": "Energies mean-centred per system to cancel the DFT-reference offset; forces evaluated without centering (conservative).",
+        "force_mae_eV_A": 0.3185468624281036,
+        "force_rmse_eV_A": 0.433320050257116
+      }
+    },
+    "Reaction": {
+      "testset": {
+        "n_structures": 1500,
+        "mean_natoms": 69.0,
+        "inference_wall_sec": 41.72,
+        "energy_mae_eV": 0.2798868593626637,
+        "energy_rmse_eV": 0.3711350961869357,
+        "energy_mae_meV_per_atom": 4.056331295111068,
+        "note": "Energies mean-centred per system to cancel the DFT-reference offset; forces evaluated without centering (conservative).",
+        "force_mae_eV_A": 0.12655036337811323,
+        "force_rmse_eV_A": 0.17589179978726563
+      }
+    },
+    "Zr-O": {
+      "testset": {
+        "n_structures": 1638,
+        "mean_natoms": 18.6,
+        "inference_wall_sec": 41.04,
+        "energy_mae_eV": 0.8589231642739024,
+        "energy_rmse_eV": 1.3296804293931646,
+        "energy_mae_meV_per_atom": 46.17533043685884,
+        "note": "Energies mean-centred per system to cancel the DFT-reference offset; forces evaluated without centering (conservative).",
+        "force_mae_eV_A": 0.2190270712409037,
+        "force_rmse_eV_A": 0.3124855481585309
+      }
+    }
+  }
+}
