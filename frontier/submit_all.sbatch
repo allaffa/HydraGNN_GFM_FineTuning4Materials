@@ -212,7 +212,7 @@ pipeline_md17() {
 }
 
 # ===========================================================================
-# ABC3 pipeline (formation energy fine-tune only; no zero-shot step)
+# ABC3 pipeline (formation energy; HydraGNN FT + MACE FT + UMA/MACE zero-shot)
 # ===========================================================================
 pipeline_abc3() {
     local NODE=$1
@@ -221,19 +221,19 @@ pipeline_abc3() {
 
     cd "${REPO_ROOT}"
     if [ ! -f "${RES}/.hydragnn_done" ]; then
-        echo "### ABC3 [1/3] HydraGNN fine-tune"
+        echo "### ABC3 [1/5] HydraGNN fine-tune"
         srun_on "$NODE" python -u examples/abc3/ensemble_fine_tune.py \
             && touch "${RES}/.hydragnn_done"
     else
-        echo "### ABC3 [1/3] HydraGNN fine-tune — SKIPPED (results exist)"
+        echo "### ABC3 [1/5] HydraGNN fine-tune — SKIPPED (results exist)"
     fi
 
     cd "${REPO_ROOT}/examples/abc3"
     if [ ! -f "${RES}/mace_finetuned_summary.json" ]; then
-        echo "### ABC3 [2/3] MACE fine-tune"
+        echo "### ABC3 [2/5] MACE fine-tune"
         srun_on "$NODE" "${MACE_PY}" -u run_mace_finetune.py --device cuda
     else
-        echo "### ABC3 [2/3] MACE fine-tune — SKIPPED (results exist)"
+        echo "### ABC3 [2/5] MACE fine-tune — SKIPPED (results exist)"
     fi
 
     if [ ! -f "${RES}/mace_finetuned_lora_summary.json" ]; then
@@ -243,16 +243,33 @@ pipeline_abc3() {
         echo "### ABC3 [2b] MACE LoRA fine-tune — SKIPPED (results exist)"
     fi
 
-    echo "### ABC3 [3/3] UMA fine-tune (full then frozen then LoRA — sequential)"
+    echo "### ABC3 [3/5] UMA fine-tune (full only; frozen/lora too slow at 55 min/epoch)"
     if [ ! -f "${RES}/uma_finetuned_full_summary.json" ]; then
         srun_on "$NODE" python -u run_uma_finetune.py --device cuda --tag full --epochs 2 \
             || { echo "ABC3 UMA full failed" >&2; exit 1; }
     else
-        echo "### ABC3 [3/3] UMA full — SKIPPED (results exist)"
+        echo "### ABC3 [3/5] UMA full — SKIPPED (results exist)"
     fi
     # ABC3 has 3185 training samples; UMA takes ~55 min/epoch → frozen/lora
     # at 10 epochs each ≈ 9h: not feasible in 2h debug QOS.  Skip.
-    echo "### ABC3 [3/3] UMA frozen/lora — SKIPPED (too slow: ~55 min/epoch × 10ep)"
+    echo "### ABC3 [3/5] UMA frozen/lora — SKIPPED (too slow: ~55 min/epoch × 10ep)"
+
+    echo "### ABC3 [4/5] UMA zero-shot"
+    if [ ! -f "${RES}/uma_benchmark_summary.json" ]; then
+        srun_on "$NODE" python -u run_uma_benchmark.py --device cuda \
+            --hydragnn-summary "${RES}/benchmark_summary.json"
+    else
+        echo "### ABC3 [4/5] UMA zero-shot — SKIPPED (results exist)"
+    fi
+
+    echo "### ABC3 [5/5] MACE zero-shot"
+    if [ ! -f "${RES}/mace_benchmark_summary.json" ]; then
+        srun_on "$NODE" "${MACE_PY}" -u run_mace_benchmark.py --device cuda \
+            --hydragnn-summary "${RES}/benchmark_summary.json" \
+            --uma-summary "${RES}/uma_benchmark_summary.json"
+    else
+        echo "### ABC3 [5/5] MACE zero-shot — SKIPPED (results exist)"
+    fi
     echo "### ABC3 pipeline complete."
 }
 
