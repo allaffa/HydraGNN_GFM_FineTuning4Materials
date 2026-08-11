@@ -15,7 +15,7 @@ MS25_CUTOFFS = {
     "Zr-O":     (6.0, 64),
 }
 
-VASP_SYSTEMS = ["MgO-2x2", "MgO-4x4", "HEA", "Reaction", "Zr-O"]
+ALL_SYSTEMS = list(MS25_CUTOFFS.keys())
 PICKLE_TAG = "mlip_peratom"
 
 
@@ -85,12 +85,13 @@ if __name__ == "__main__":
     parser = build_arg_parser()
     parser.add_argument("--system", type=str, default=None)
     parser.add_argument("--scratch", action="store_true")
+    parser.add_argument("--freeze", action="store_true")
     args = parser.parse_args()
 
     here = Path(__file__).resolve().parent
     repo = here.parent.parent
 
-    systems = [args.system] if args.system else VASP_SYSTEMS
+    systems = [args.system] if args.system else ALL_SYSTEMS
 
     for system in systems:
         if system not in MS25_CUTOFFS:

@@ -343,24 +343,74 @@ pipeline_ms25() {
     set -euo pipefail
     cd "${REPO_ROOT}/examples/ms25"
 
-    if [ ! -f "${RES}/.hydragnn_done" ]; then
-        echo "### MS25 [1/4] HydraGNN fine-tune (all systems)"
-        srun_on "$NODE" python -u ensemble_fine_tune.py \
-            && touch "${RES}/.hydragnn_done"
+    if [ ! -f "${RES}/hydragnn_benchmark_summary.json" ]; then
+        echo "### MS25 [1/4] HydraGNN fine-tune (all 8 systems in parallel, one per GCD)"
+        gcd=0
+        for system in MgO-2x2 MgO-4x4 H2O-64 H2O-192 CHA HEA Reaction Zr-O; do
+            srun_gcd "$NODE" $gcd python -u ensemble_fine_tune.py --system "$system" &
+            gcd=$((gcd+1))
+        done
+        wait
+        python3 -u -c "
+import json, os, sys
+systems = ['MgO-2x2','MgO-4x4','H2O-64','H2O-192','CHA','HEA','Reaction','Zr-O']
+results = {}
+for s in systems:
+    fp = os.path.join('logs', s + '_mlip_seed0', 'benchmark_summary.json')
+    if os.path.isfile(fp):
+        with open(fp) as f:
+            results[s] = json.load(f)
+    else:
+        print(f'[WARN] no result for {s}: {fp}', file=sys.stderr)
+out = '${RES}/hydragnn_benchmark_summary.json'
+with open(out, 'w') as f:
+    json.dump(results, f, indent=2)
+print(f'HydraGNN MS25 results saved to {out}')
+"
     else
         echo "### MS25 [1/4] HydraGNN fine-tune — SKIPPED (results exist)"
     fi
 
-    # MS25 has 5 systems with 5000-8000 train samples each; MACE FT takes ~2h/system → infeasible.
-    echo "### MS25 [2/4] MACE fine-tune — SKIPPED (5 systems × ~2h each, not feasible in 2h debug QOS)"
-
-    # MS25 is MLIP multi-system; UMA fine-tune is similarly slow as ABC3.
-    # Skip UMA frozen/lora; zero-shot benchmarks still run below.
+    # MS25 MACE/UMA FT: infeasible (large systems, ~2h per system).
+    echo "### MS25 [2/4] MACE fine-tune — SKIPPED (8 systems × ~2h each, not feasible in 2h debug QOS)"
     echo "### MS25 [3/4] UMA frozen/lora — SKIPPED (large dataset, not feasible in 2h debug QOS)"
 
     echo "### MS25 [4/4] Zero-shot benchmarks"
-    srun_on "$NODE" python -u run_uma_benchmark.py --device cuda
-    srun_on "$NODE" "${MACE_PY}" -u run_mace_benchmark.py --device cuda
+    if [ ! -f "${RES}/uma_benchmark_summary.json" ]; then
+        srun_on "$NODE" python -u run_uma_benchmark.py --device cuda
+    else
+        echo "### MS25 [4/4] UMA zero-shot — SKIPPED (results exist)"
+    fi
+    if [ ! -f "${RES}/mace_benchmark_summary.json" ]; then
+        srun_on "$NODE" "${MACE_PY}" -u run_mace_benchmark.py --device cuda
+    else
+        echo "### MS25 [4/4] MACE zero-shot — SKIPPED (results exist)"
+    fi
+
+    echo ""
+    echo "============================================================"
+    echo "  MS25 — energy MAE (meV/atom)"
+    echo "============================================================"
+    python3 -c "
+import json, os
+res_dir = '${RES}'
+systems = ['MgO-2x2','MgO-4x4','H2O-64','H2O-192','CHA','HEA','Reaction','Zr-O']
+hgnn_f = os.path.join(res_dir, 'hydragnn_benchmark_summary.json')
+mace_f = os.path.join(res_dir, 'mace_benchmark_summary.json')
+uma_f  = os.path.join(res_dir, 'uma_benchmark_summary.json')
+hgnn = json.load(open(hgnn_f)) if os.path.isfile(hgnn_f) else {}
+mace_root = json.load(open(mace_f)) if os.path.isfile(mace_f) else {}
+mace = next(iter(mace_root.values()), {}) if mace_root else {}
+uma  = json.load(open(uma_f))  if os.path.isfile(uma_f)  else {}
+print(f'  {\"System\":<14} {\"HydraGNN FT\":>14} {\"MACE-MP-0 ZS\":>14} {\"UMA ZS\":>10}')
+print('  ' + '-'*56)
+for s in systems:
+    h = hgnn.get(s, {})
+    hv = h.get('test_mae_eV_per_atom', h.get('test_mae_eV', float('nan'))) * 1000 if h else float('nan')
+    mv = mace.get(s, {}).get('testset', {}).get('energy_mae_meV_per_atom', float('nan'))
+    uv = uma.get(s, {}).get('testset', {}).get('energy_mae_meV_per_atom', float('nan'))
+    print(f'  {s:<14} {hv:>14.2f} {mv:>14.2f} {uv:>10.2f}')
+" 2>/dev/null || true
     echo "### MS25 pipeline complete."
 }
 
