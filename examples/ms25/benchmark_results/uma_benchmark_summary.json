@@ -5,104 +5,104 @@
     "testset": {
       "n_structures": 1638,
       "mean_natoms": 64.0,
-      "inference_wall_sec": 147.39,
-      "energy_mae_eV": 0.04627552414291393,
-      "energy_rmse_eV": 0.058492963204630224,
-      "energy_mae_meV_per_atom": 0.7230550647330302,
+      "inference_wall_sec": 144.54,
+      "energy_mae_eV": 0.04627558673405165,
+      "energy_rmse_eV": 0.058492833490128744,
+      "energy_mae_meV_per_atom": 0.723056042719557,
       "note": "Energies mean-centred per system to cancel the DFT-reference offset; forces evaluated without centering (conservative).",
-      "force_mae_eV_A": 0.024417810847995536,
-      "force_rmse_eV_A": 0.04195441989563862
+      "force_mae_eV_A": 0.024417810585121217,
+      "force_rmse_eV_A": 0.041954420708857416
     }
   },
   "MgO-4x4": {
     "testset": {
       "n_structures": 1638,
       "mean_natoms": 256.0,
-      "inference_wall_sec": 210.82,
-      "energy_mae_eV": 0.06767220252292953,
-      "energy_rmse_eV": 0.08228340280582389,
-      "energy_mae_meV_per_atom": 0.2643445411051935,
+      "inference_wall_sec": 210.43,
+      "energy_mae_eV": 0.06767087087900388,
+      "energy_rmse_eV": 0.08228191366924108,
+      "energy_mae_meV_per_atom": 0.2643393393711089,
       "note": "Energies mean-centred per system to cancel the DFT-reference offset; forces evaluated without centering (conservative).",
-      "force_mae_eV_A": 0.02112136080072315,
-      "force_rmse_eV_A": 0.035748592699018096
+      "force_mae_eV_A": 0.021121361339481844,
+      "force_rmse_eV_A": 0.03574859363709304
     }
   },
   "H2O-64": {
     "testset": {
       "n_structures": 1638,
       "mean_natoms": 192.0,
-      "inference_wall_sec": 218.57,
-      "energy_mae_eV": 0.406172593484279,
-      "energy_rmse_eV": 0.547994133147264,
-      "energy_mae_meV_per_atom": 2.1154822577306196,
+      "inference_wall_sec": 218.12,
+      "energy_mae_eV": 0.4061730890026762,
+      "energy_rmse_eV": 0.5479944787566551,
+      "energy_mae_meV_per_atom": 2.1154848385556053,
       "note": "Energies mean-centred per system to cancel the DFT-reference offset; forces evaluated without centering (conservative).",
-      "force_mae_eV_A": 0.1339444552937879,
-      "force_rmse_eV_A": 0.15648123461831204
+      "force_mae_eV_A": 0.133944458986444,
+      "force_rmse_eV_A": 0.15648123886867557
     }
   },
   "H2O-192": {
     "testset": {
       "n_structures": 1638,
       "mean_natoms": 576.0,
-      "inference_wall_sec": 548.2,
-      "energy_mae_eV": 1.0143263807988125,
-      "energy_rmse_eV": 1.499665570578016,
-      "energy_mae_meV_per_atom": 1.7609832999979385,
+      "inference_wall_sec": 546.47,
+      "energy_mae_eV": 1.0143274038753196,
+      "energy_rmse_eV": 1.4996657956770203,
+      "energy_mae_meV_per_atom": 1.76098507617243,
       "note": "Energies mean-centred per system to cancel the DFT-reference offset; forces evaluated without centering (conservative).",
-      "force_mae_eV_A": 0.13385167750466062,
-      "force_rmse_eV_A": 0.15634203614677625
+      "force_mae_eV_A": 0.1338516724822521,
+      "force_rmse_eV_A": 0.1563420304787255
     }
   },
   "CHA": {
     "testset": {
       "n_structures": 1638,
       "mean_natoms": 288.0,
-      "inference_wall_sec": 157.15,
-      "energy_mae_eV": 0.5530118986794988,
-      "energy_rmse_eV": 0.6428402925296522,
-      "energy_mae_meV_per_atom": 1.9201802037482598,
+      "inference_wall_sec": 157.17,
+      "energy_mae_eV": 0.5530137528641822,
+      "energy_rmse_eV": 0.6428408090172906,
+      "energy_mae_meV_per_atom": 1.9201866418895215,
       "note": "Energies mean-centred per system to cancel the DFT-reference offset; forces evaluated without centering (conservative).",
-      "force_mae_eV_A": 0.0828234160608489,
-      "force_rmse_eV_A": 0.09950954822196072
+      "force_mae_eV_A": 0.08282341573834678,
+      "force_rmse_eV_A": 0.09950954754553158
     }
   },
   "HEA": {
     "testset": {
       "n_structures": 1638,
       "mean_natoms": 108.0,
-      "inference_wall_sec": 134.36,
-      "energy_mae_eV": 11.002138431511595,
-      "energy_rmse_eV": 13.623867279960017,
-      "energy_mae_meV_per_atom": 101.87165214362588,
+      "inference_wall_sec": 134.26,
+      "energy_mae_eV": 11.002138274229484,
+      "energy_rmse_eV": 13.623867057973031,
+      "energy_mae_meV_per_atom": 101.87165068731004,
       "note": "Energies mean-centred per system to cancel the DFT-reference offset; forces evaluated without centering (conservative).",
-      "force_mae_eV_A": 0.280699202791606,
-      "force_rmse_eV_A": 0.3852139027309882
+      "force_mae_eV_A": 0.28069920250270697,
+      "force_rmse_eV_A": 0.38521390234169534
     }
   },
   "Reaction": {
     "testset": {
       "n_structures": 1500,
       "mean_natoms": 69.0,
-      "inference_wall_sec": 108.13,
-      "energy_mae_eV": 0.23001936302711878,
-      "energy_rmse_eV": 0.29273947970550335,
-      "energy_mae_meV_per_atom": 3.333613956914765,
+      "inference_wall_sec": 107.89,
+      "energy_mae_eV": 0.23001930448610874,
+      "energy_rmse_eV": 0.2927394824560893,
+      "energy_mae_meV_per_atom": 3.3336131084943292,
       "note": "Energies mean-centred per system to cancel the DFT-reference offset; forces evaluated without centering (conservative).",
-      "force_mae_eV_A": 0.0732348517488579,
-      "force_rmse_eV_A": 0.11612876331823574
+      "force_mae_eV_A": 0.07323485302714389,
+      "force_rmse_eV_A": 0.11612876459479324
     }
   },
   "Zr-O": {
     "testset": {
       "n_structures": 1638,
       "mean_natoms": 18.6,
-      "inference_wall_sec": 119.06,
-      "energy_mae_eV": 0.09253155616715501,
-      "energy_rmse_eV": 0.1699571086913707,
-      "energy_mae_meV_per_atom": 4.974455643499947,
+      "inference_wall_sec": 118.2,
+      "energy_mae_eV": 0.09253160125260505,
+      "energy_rmse_eV": 0.16995711452171583,
+      "energy_mae_meV_per_atom": 4.974458067273855,
       "note": "Energies mean-centred per system to cancel the DFT-reference offset; forces evaluated without centering (conservative).",
-      "force_mae_eV_A": 0.061404883779938454,
-      "force_rmse_eV_A": 0.09186250521697624
+      "force_mae_eV_A": 0.06140488433253614,
+      "force_rmse_eV_A": 0.09186250587780768
     }
   }
 }

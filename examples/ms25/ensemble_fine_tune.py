@@ -85,7 +85,6 @@ if __name__ == "__main__":
     parser = build_arg_parser()
     parser.add_argument("--system", type=str, default=None)
     parser.add_argument("--scratch", action="store_true")
-    parser.add_argument("--freeze", action="store_true")
     args = parser.parse_args()
 
     here = Path(__file__).resolve().parent
