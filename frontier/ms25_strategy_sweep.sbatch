@@ -3,8 +3,8 @@
 #SBATCH -J ms25_ft_sweep
 #SBATCH -o logs/frontier/ms25-sweep-%j.out
 #SBATCH -e logs/frontier/ms25-sweep-%j.out
-#SBATCH -t 3-00:00:00
-#SBATCH -p batch
+#SBATCH -t 24:00:00
+#SBATCH -p extended
 #SBATCH -N 3
 
 set -euo pipefail
