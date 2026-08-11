@@ -214,6 +214,8 @@ def parse_args():
     p.add_argument("--freeze-backbone", action="store_true")
     p.add_argument("--tag", default=None,
                    help="Variant tag; writes uma_finetuned_{tag}_summary.json and suffixes result keys.")
+    p.add_argument("--output-path", default=None,
+                   help="Explicit result path, useful for concurrent per-system runs.")
     p.add_argument("--lora", action="store_true",
                    help="LoRA fine-tuning of backbone scalar linear layers (preserves equivariance).")
     p.add_argument("--lora-r", type=int, default=8, help="LoRA rank (default: 8).")
@@ -229,7 +231,8 @@ def main():
         f"uma_finetuned_{args.tag}_summary.json" if args.tag
         else "uma_finetuned_summary.json"
     )
-    out_path = RESULTS_DIR / _summary_name
+    out_path = Path(args.output_path) if args.output_path else RESULTS_DIR / _summary_name
+    out_path.parent.mkdir(parents=True, exist_ok=True)
 
     all_results: dict = {}
     for system in args.systems:

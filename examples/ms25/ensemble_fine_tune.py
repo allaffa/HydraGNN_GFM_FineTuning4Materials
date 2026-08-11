@@ -31,7 +31,7 @@ MS25_EPOCHS = {
 }
 
 
-def run_system(system, here, repo, scratch=False, freeze=False):
+def run_system(system, here, repo, strategy="full", scratch=False):
     radius, max_nbrs = MS25_CUTOFFS[system]
 
     parser = build_arg_parser()
@@ -46,12 +46,11 @@ def run_system(system, here, repo, scratch=False, freeze=False):
     args.pretrained_model_ensemble_path = str((repo / "pretrained_model_ensemble").resolve())
     args.datasetname = f"{system}_{PICKLE_TAG}"
 
-    if scratch:
-        suffix = "scratch"
-    elif freeze:
-        suffix = "frozen"
-    else:
-        suffix = "mlip"
+    suffix = "scratch" if scratch else {
+        "full": "mlip",
+        "frozen_message_passing": "frozen_message_passing",
+        "frozen_decoder": "frozen_decoder",
+    }[strategy]
 
     args.modelname = f"{system}_{suffix}_seed0"
 
@@ -64,8 +63,11 @@ def run_system(system, here, repo, scratch=False, freeze=False):
     cfg["NeuralNetwork"]["Architecture"]["periodic_boundary_conditions"] = True
     cfg["NeuralNetwork"]["Training"]["num_epoch"] = MS25_EPOCHS[system]
     cfg["NeuralNetwork"]["Training"]["train_from_scratch"] = scratch
-    # freeze_mode is read by apply_freeze_mode in update_model.py
-    cfg["NeuralNetwork"]["Training"]["freeze_mode"] = "message passing" if freeze else "None"
+    cfg["NeuralNetwork"]["Training"]["freeze_mode"] = {
+        "full": "None",
+        "frozen_message_passing": "message passing",
+        "frozen_decoder": "shared + head",
+    }[strategy]
 
     log_dir = here / "logs" / args.modelname
     os.makedirs(log_dir, exist_ok=True)
@@ -85,7 +87,7 @@ def run_system(system, here, repo, scratch=False, freeze=False):
     }
 
     print(f"\n{'='*60}")
-    print(f"[MS25] system={system}  scratch={scratch}  freeze={freeze}")
+    print(f"[MS25] system={system}  strategy={strategy}  scratch={scratch}")
     print(f"[MS25] dataset={args.datasetname}.pickle")
     print(f"[MS25] modelname={args.modelname}")
     print(f"[MS25] config={args.finetuning_config}")
@@ -98,6 +100,11 @@ if __name__ == "__main__":
     parser = build_arg_parser()
     parser.add_argument("--system", type=str, default=None)
     parser.add_argument("--scratch", action="store_true")
+    parser.add_argument(
+        "--strategy",
+        choices=["full", "frozen_message_passing", "frozen_decoder"],
+        default="full",
+    )
     args = parser.parse_args()
 
     here = Path(__file__).resolve().parent
@@ -109,4 +116,4 @@ if __name__ == "__main__":
         if system not in MS25_CUTOFFS:
             print(f"[SKIP] Unknown system: {system}")
             continue
-        run_system(system, here, repo, scratch=args.scratch, freeze=args.freeze)
+        run_system(system, here, repo, strategy=args.strategy, scratch=args.scratch)

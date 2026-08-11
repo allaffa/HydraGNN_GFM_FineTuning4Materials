@@ -248,6 +248,8 @@ def parse_args():
                    choices=list(MACE_MODELS.keys()))
     p.add_argument("--tag", default="",
                    help="Variant tag (e.g. 'lora'). Output: mace_finetuned_<tag>_summary.json.")
+    p.add_argument("--output-path", default=None,
+                   help="Explicit result path, useful for concurrent per-system runs.")
     p.add_argument("--lora", action="store_true", help="Enable native MACE LoRA fine-tuning.")
     p.add_argument("--lora-r", type=int, default=4, dest="lora_rank", help="LoRA rank (default: 4).")
     p.add_argument("--lora-alpha", type=float, default=1.0, dest="lora_alpha",
@@ -267,7 +269,12 @@ def main():
     lr = args.lr if args.lr is not None else (0.005 if args.lora else 1e-3)
     epochs = args.epochs if args.epochs is not None else (10 if args.lora else 50)
     _tag = args.tag
-    out_path = RESULTS_DIR / (f"mace_finetuned_{_tag}_summary.json" if _tag else "mace_finetuned_summary.json")
+    out_path = (
+        Path(args.output_path)
+        if args.output_path
+        else RESULTS_DIR / (f"mace_finetuned_{_tag}_summary.json" if _tag else "mace_finetuned_summary.json")
+    )
+    out_path.parent.mkdir(parents=True, exist_ok=True)
 
     all_results: dict = {}
 

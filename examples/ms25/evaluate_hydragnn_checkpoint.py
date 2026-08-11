@@ -27,9 +27,10 @@ def extract_graph_energy(model_output):
     return model_output.reshape(-1)
 
 
-def evaluate(system, repo, batch_size):
-    log_dir = repo / "examples" / "ms25" / "logs" / f"{system}_mlip_seed0"
-    config_path = log_dir / "finetuning_config_mlip.json"
+def evaluate(system, strategy, repo, batch_size):
+    suffix = "mlip" if strategy == "full" else strategy
+    log_dir = repo / "examples" / "ms25" / "logs" / f"{system}_{suffix}_seed0"
+    config_path = log_dir / f"finetuning_config_{suffix}.json"
     with open(config_path) as config_file:
         config = json.load(config_file)
 
@@ -128,8 +129,9 @@ def evaluate(system, repo, batch_size):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--system", required=True)
+    parser.add_argument("--strategy", default="full")
     parser.add_argument("--batch-size", type=int, default=2)
     parsed = parser.parse_args()
     repository = Path(__file__).resolve().parents[2]
     setup_distributed_finetuning()
-    evaluate(parsed.system, repository, parsed.batch_size)
+    evaluate(parsed.system, parsed.strategy, repository, parsed.batch_size)
