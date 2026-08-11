@@ -350,7 +350,12 @@ pipeline_ms25() {
             srun_gcd "$NODE" $gcd python -u ensemble_fine_tune.py --system "$system" &
             gcd=$((gcd+1))
         done
+        # watchdog: kill any remaining training after 90 min so the collection step always runs
+        ( sleep 90m && echo "[watchdog] 90 min elapsed — killing remaining training jobs" \
+            && kill $(jobs -p) 2>/dev/null ) &
+        WATCHDOG=$!
         wait
+        kill "$WATCHDOG" 2>/dev/null || true
         python3 -u -c "
 import json, os, sys
 systems = ['MgO-2x2','MgO-4x4','H2O-64','H2O-192','CHA','HEA','Reaction','Zr-O']

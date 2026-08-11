@@ -18,6 +18,18 @@ MS25_CUTOFFS = {
 ALL_SYSTEMS = list(MS25_CUTOFFS.keys())
 PICKLE_TAG = "mlip_peratom"
 
+# Fewer epochs for large-atom systems (~20 min/epoch on 1 GCD) to stay within 90-min budget
+MS25_EPOCHS = {
+    "MgO-2x2": 10,
+    "MgO-4x4": 5,
+    "H2O-64":  5,
+    "H2O-192": 3,
+    "CHA":     5,
+    "HEA":     10,
+    "Reaction":10,
+    "Zr-O":    10,
+}
+
 
 def run_system(system, here, repo, scratch=False, freeze=False):
     radius, max_nbrs = MS25_CUTOFFS[system]
@@ -50,7 +62,7 @@ def run_system(system, here, repo, scratch=False, freeze=False):
     cfg["NeuralNetwork"]["Architecture"]["radius"] = float(radius)
     cfg["NeuralNetwork"]["Architecture"]["max_neighbours"] = int(max_nbrs)
     cfg["NeuralNetwork"]["Architecture"]["periodic_boundary_conditions"] = True
-    cfg["NeuralNetwork"]["Training"]["num_epoch"] = 10
+    cfg["NeuralNetwork"]["Training"]["num_epoch"] = MS25_EPOCHS[system]
     cfg["NeuralNetwork"]["Training"]["train_from_scratch"] = scratch
     # freeze_mode is read by apply_freeze_mode in update_model.py
     cfg["NeuralNetwork"]["Training"]["freeze_mode"] = "message passing" if freeze else "None"
