@@ -345,16 +345,18 @@ pipeline_ms25() {
 
     if [ ! -f "${RES}/hydragnn_benchmark_summary.json" ]; then
         echo "### MS25 [1/4] HydraGNN fine-tune (all 8 systems in parallel, one per GCD)"
+        TRAIN_PIDS=()
         gcd=0
         for system in MgO-2x2 MgO-4x4 H2O-64 H2O-192 CHA HEA Reaction Zr-O; do
             srun_gcd "$NODE" $gcd python -u ensemble_fine_tune.py --system "$system" &
+            TRAIN_PIDS+=($!)
             gcd=$((gcd+1))
         done
-        # watchdog: kill any remaining training after 90 min so the collection step always runs
-        ( sleep 90m && echo "[watchdog] 90 min elapsed — killing remaining training jobs" \
-            && kill $(jobs -p) 2>/dev/null ) &
+        # watchdog: kill remaining training after 90 min using explicit PIDs
+        ( sleep 90m && echo "[watchdog] 90 min elapsed — killing remaining training" \
+            && kill "${TRAIN_PIDS[@]}" 2>/dev/null ) &
         WATCHDOG=$!
-        wait
+        wait "${TRAIN_PIDS[@]}" || true   # || true: some may be killed by watchdog
         kill "$WATCHDOG" 2>/dev/null || true
         python3 -u -c "
 import json, os, sys
@@ -366,11 +368,14 @@ for s in systems:
         with open(fp) as f:
             results[s] = json.load(f)
     else:
-        print(f'[WARN] no result for {s}: {fp}', file=sys.stderr)
+        print(f'[WARN] no result for {s}', file=sys.stderr)
+if not results:
+    print('[ERROR] no per-system results found — not writing summary', file=sys.stderr)
+    sys.exit(1)
 out = '${RES}/hydragnn_benchmark_summary.json'
 with open(out, 'w') as f:
     json.dump(results, f, indent=2)
-print(f'HydraGNN MS25 results saved to {out}')
+print(f'HydraGNN MS25 results saved ({len(results)}/8 systems): {out}')
 "
     else
         echo "### MS25 [1/4] HydraGNN fine-tune — SKIPPED (results exist)"
