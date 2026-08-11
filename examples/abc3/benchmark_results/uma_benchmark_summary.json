@@ -1,0 +1,13 @@
+{
+  "model_name": "uma-s-1p2",
+  "task_name": "omat",
+  "dataset": "/lustre/orion/lrn070/world-shared/mlupopa/HydraGNN_GFM_FineTuning4Materials/dataset/abc3.pickle",
+  "testset": {
+    "n_structures": 683,
+    "inference_wall_sec": 71.62,
+    "energy_per_atom_mae_eV": 0.11783384986233289,
+    "energy_per_atom_rmse_eV": 0.1718526848301006,
+    "energy_per_atom_mae_kcal_mol": 2.7173546282902725,
+    "note": "UMA total energy corrected by per-element linear reference energies (least-squares fit on evaluation split), divided by n_atoms, compared to ABC3 per-atom formation energy."
+  }
+}

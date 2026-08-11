@@ -710,6 +710,9 @@ def test_ensemble(model_ens, loader, dataset_name, verbosity, save_results:bool=
 
             if hasattr(data, "natoms"):
                 natoms.append(data.natoms)
+            elif hasattr(data, "batch") and data.batch is not None:
+                # fallback: count nodes per graph from the batch index
+                natoms.append(torch.bincount(data.batch))
 
             for ihead in range(num_heads):
                 head_val = ytrue[head_index[ihead]]

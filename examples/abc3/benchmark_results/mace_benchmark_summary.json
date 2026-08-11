@@ -1,0 +1,13 @@
+{
+  "mace_mp0_medium": {
+    "label": "MACE-MP-0 (medium)",
+    "testset": {
+      "n_structures": 683,
+      "inference_wall_sec": 41.9,
+      "energy_mae_eV_per_atom": 0.11805178877946154,
+      "energy_rmse_eV_per_atom": 0.17085209572389157,
+      "energy_mae_kcal_mol_per_atom": 2.7223804958642845,
+      "note": "MACE total energy corrected by per-element linear reference energies (least-squares fit on evaluation split), divided by n_atoms, compared to ABC3 per-atom formation energy."
+    }
+  }
+}
