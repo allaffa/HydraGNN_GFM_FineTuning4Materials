@@ -381,6 +381,43 @@ print(f'HydraGNN MS25 results saved ({len(results)}/8 systems): {out}')
         echo "### MS25 [1/4] HydraGNN fine-tune — SKIPPED (results exist)"
     fi
 
+    NEED_FORCE=$(python3 -c "
+import json, os
+p = '${RES}/hydragnn_benchmark_summary.json'
+d = json.load(open(p)) if os.path.isfile(p) else {}
+print(int(len(d) != 8 or any('test_force_mae_eV_A' not in value for value in d.values())))
+")
+    if [ "$NEED_FORCE" -eq 1 ]; then
+        echo "### MS25 [1b/4] HydraGNN checkpoint energy + force evaluation"
+        EVAL_PIDS=()
+        gcd=0
+        for system in MgO-2x2 MgO-4x4 H2O-64 H2O-192 CHA HEA Reaction Zr-O; do
+            srun_gcd "$NODE" $gcd python -u evaluate_hydragnn_checkpoint.py --system "$system" &
+            EVAL_PIDS+=($!)
+            gcd=$((gcd+1))
+        done
+        wait "${EVAL_PIDS[@]}"
+
+        python3 -u -c "
+import json, os, sys
+systems = ['MgO-2x2','MgO-4x4','H2O-64','H2O-192','CHA','HEA','Reaction','Zr-O']
+results = {}
+for s in systems:
+    fp = os.path.join('logs', s + '_mlip_seed0', 'benchmark_results', 'checkpoint_benchmark_summary.json')
+    if not os.path.isfile(fp):
+        print(f'[ERROR] missing checkpoint result for {s}: {fp}', file=sys.stderr)
+        sys.exit(1)
+    with open(fp) as f:
+        results[s] = json.load(f)
+out = '${RES}/hydragnn_benchmark_summary.json'
+with open(out, 'w') as f:
+    json.dump(results, f, indent=2)
+print(f'HydraGNN MS25 checkpoint metrics saved (8/8 systems): {out}')
+"
+    else
+        echo "### MS25 [1b/4] HydraGNN checkpoint energy + force evaluation — SKIPPED (results exist)"
+    fi
+
     # MS25 MACE/UMA FT: infeasible (large systems, ~2h per system).
     echo "### MS25 [2/4] MACE fine-tune — SKIPPED (8 systems × ~2h each, not feasible in 2h debug QOS)"
     echo "### MS25 [3/4] UMA frozen/lora — SKIPPED (large dataset, not feasible in 2h debug QOS)"
@@ -420,6 +457,15 @@ for s in systems:
     mv = mace.get(s, {}).get('testset', {}).get('energy_mae_meV_per_atom', float('nan'))
     uv = uma.get(s, {}).get('testset', {}).get('energy_mae_meV_per_atom', float('nan'))
     print(f'  {s:<14} {hv:>14.2f} {mv:>14.2f} {uv:>10.2f}')
+print()
+print(f'  {"System":<14} {"HydraGNN FT":>14} {"MACE-MP-0 ZS":>14} {"UMA ZS":>10}')
+print(f'  {"":<14} {"F-MAE eV/A":>14} {"F-MAE eV/A":>14} {"F-MAE eV/A":>10}')
+print('  ' + '-'*56)
+for s in systems:
+    hv = hgnn.get(s, {}).get('test_force_mae_eV_A', float('nan'))
+    mv = mace.get(s, {}).get('testset', {}).get('force_mae_eV_A', float('nan'))
+    uv = uma.get(s, {}).get('testset', {}).get('force_mae_eV_A', float('nan'))
+    print(f'  {s:<14} {hv:>14.4f} {mv:>14.4f} {uv:>10.4f}')
 " 2>/dev/null || true
     echo "### MS25 pipeline complete."
 }
