@@ -67,14 +67,15 @@ def run_system(system, here, repo, scratch=False, freeze=False):
     # freeze_mode is read by apply_freeze_mode in update_model.py
     cfg["NeuralNetwork"]["Training"]["freeze_mode"] = "message passing" if freeze else "None"
 
-    patched_cfg_path = here / f"finetuning_config_patched_{system}_{suffix}.json"
-    with open(patched_cfg_path, "w") as f:
-        json.dump(cfg, f, indent=2)
-    args.finetuning_config = str(patched_cfg_path.resolve())
-
     log_dir = here / "logs" / args.modelname
     os.makedirs(log_dir, exist_ok=True)
     os.environ["FINETUNING_LOG_DIR"] = str(log_dir)
+
+    # Place patched config inside log_dir so run_finetune saves benchmark_summary.json there
+    patched_cfg_path = log_dir / f"finetuning_config_{suffix}.json"
+    with open(patched_cfg_path, "w") as f:
+        json.dump(cfg, f, indent=2)
+    args.finetuning_config = str(patched_cfg_path.resolve())
 
     dictionary_variables = {
         "graph_feature_names": ["energy"],

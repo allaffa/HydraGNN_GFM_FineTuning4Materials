@@ -361,7 +361,7 @@ import json, os, sys
 systems = ['MgO-2x2','MgO-4x4','H2O-64','H2O-192','CHA','HEA','Reaction','Zr-O']
 results = {}
 for s in systems:
-    fp = os.path.join('logs', s + '_mlip_seed0', 'benchmark_summary.json')
+    fp = os.path.join('logs', s + '_mlip_seed0', 'benchmark_results', 'benchmark_summary.json')
     if os.path.isfile(fp):
         with open(fp) as f:
             results[s] = json.load(f)
